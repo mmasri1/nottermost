@@ -30,6 +30,8 @@ export type Message = {
   senderId: string;
   body: string;
   createdAt: string;
+  editedAt?: string | null;
+  deletedAt?: string | null;
 };
 
 export type Channel = {
@@ -71,6 +73,8 @@ export type ChannelMessage = {
   replyToId?: string | null;
   replyCount?: number;
   lastReplyAt?: string | null;
+  editedAt?: string | null;
+  deletedAt?: string | null;
 };
 
 export type CursorPage<T> = {
@@ -82,10 +86,63 @@ export type WsClientMessage =
   | { type: "subscribe.thread"; threadId: string }
   | { type: "unsubscribe.thread"; threadId: string }
   | { type: "subscribe.channel"; channelId: string }
-  | { type: "unsubscribe.channel"; channelId: string };
+  | { type: "unsubscribe.channel"; channelId: string }
+  | { type: "typing.start"; scope: "channel"; channelId: string }
+  | { type: "typing.stop"; scope: "channel"; channelId: string }
+  | { type: "typing.start"; scope: "dm"; threadId: string }
+  | { type: "typing.stop"; scope: "dm"; threadId: string }
+  | { type: "presence.ping" };
 
 export type WsServerMessage =
   | { type: "ready" }
   | { type: "message.created"; message: Message }
-  | { type: "channelMessage.created"; message: ChannelMessage };
+  | { type: "channelMessage.created"; message: ChannelMessage }
+  | { type: "message.updated"; message: Message }
+  | { type: "channelMessage.updated"; message: ChannelMessage }
+  | {
+      type: "reaction.updated";
+      scope: "channel" | "dm";
+      channelId?: string;
+      threadId?: string;
+      messageId: string;
+      emoji: string;
+    }
+  | {
+      type: "typing.updated";
+      scope: "channel" | "dm";
+      channelId?: string;
+      threadId?: string;
+      userId: string;
+      isTyping: boolean;
+    }
+  | {
+      type: "presence.updated";
+      userId: string;
+      status: "online" | "away" | "offline";
+      lastSeenAt: string;
+    }
+  | {
+      type: "notification.created";
+      notification: {
+        id: string;
+        kind: string;
+        entityType: string;
+        entityId: string;
+        createdAt: string;
+        readAt: string | null;
+        workspaceId: string | null;
+        channelId: string | null;
+        threadId: string | null;
+        snippet: string | null;
+        fromUserId: string | null;
+      };
+    }
+  | {
+      type: "readState.updated";
+      scope: "channel" | "dm";
+      channelId?: string;
+      threadId?: string;
+      userId: string;
+      lastReadAt: string;
+    };
 

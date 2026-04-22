@@ -12,6 +12,11 @@ function normalizePair(a: string, b: string) {
   return a < b ? [a, b] : [b, a];
 }
 
+function extractMentions(body: string) {
+  const matches = body.match(/@[^\s@]+@[^\s@]+\.[^\s@]+/g) ?? [];
+  return Array.from(new Set(matches.map((m) => m.slice(1).toLowerCase())));
+}
+
 const createThreadSchema = z.union([
   z.object({
     workspaceId: z.string().uuid(),
@@ -256,6 +261,35 @@ dmRouter.post("/threads/:id/messages", async (req, res) => {
     data: { threadId: thread.id, senderId: userId, body: parsed.data.body },
   });
 
+  // Mentions -> notifications (best-effort).
+  const mentionedEmails = extractMentions(msg.body);
+  if (mentionedEmails.length) {
+    const users = await prisma.user.findMany({
+      where: { email: { in: mentionedEmails } },
+      select: { id: true },
+    });
+    const allowed = await prisma.dmParticipant.findMany({
+      where: { threadId: thread.id, userId: { in: users.map((u) => u.id) } },
+      select: { userId: true },
+    });
+    const allowedSet = new Set(allowed.map((x) => x.userId));
+    await prisma.notification.createMany({
+      data: users
+        .filter((u) => allowedSet.has(u.id) && u.id !== userId)
+        .map((u) => ({
+          userId: u.id,
+          kind: "mention",
+          entityType: "dmMessage",
+          entityId: msg.id,
+          fromUserId: userId,
+          workspaceId: null,
+          threadId: thread.id,
+          snippet: msg.body.slice(0, 140),
+        })),
+      skipDuplicates: true,
+    });
+  }
+
   const wsPayload: WsServerMessage = {
     type: "message.created",
     message: {
@@ -275,5 +309,167 @@ dmRouter.post("/threads/:id/messages", async (req, res) => {
     body: msg.body,
     createdAt: msg.createdAt.toISOString(),
   });
+});
+
+const editDmMessageSchema = z.object({ body: z.string().min(1).max(4000) });
+dmRouter.patch("/threads/:threadId/messages/:messageId", async (req, res) => {
+  const userId = req.userId!;
+  const threadId = z.string().uuid().safeParse(req.params.threadId);
+  const messageId = z.string().uuid().safeParse(req.params.messageId);
+  if (!threadId.success) return res.status(400).json({ error: "invalid_thread_id" });
+  if (!messageId.success) return res.status(400).json({ error: "invalid_message_id" });
+  const parsed = editDmMessageSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
+
+  const participant = await prisma.dmParticipant.findUnique({
+    where: { threadId_userId: { threadId: threadId.data, userId } },
+    select: { userId: true },
+  });
+  if (!participant) return res.status(403).json({ error: "not_in_thread" });
+
+  const msg = await prisma.message.findUnique({
+    where: { id: messageId.data },
+    select: { id: true, threadId: true, senderId: true, deletedAt: true, createdAt: true },
+  });
+  if (!msg || msg.threadId !== threadId.data) return res.status(404).json({ error: "message_not_found" });
+  if (msg.deletedAt) return res.status(409).json({ error: "message_deleted" });
+  if (msg.senderId !== userId) return res.status(403).json({ error: "not_message_author" });
+
+  const updated = await prisma.message.update({
+    where: { id: msg.id },
+    data: { body: parsed.data.body, editedAt: new Date() },
+  });
+
+  const wsPayload: WsServerMessage = {
+    type: "message.updated" as any,
+    message: {
+      id: updated.id,
+      threadId: updated.threadId,
+      senderId: updated.senderId,
+      body: updated.body,
+      createdAt: updated.createdAt.toISOString(),
+      editedAt: updated.editedAt?.toISOString() ?? null,
+      deletedAt: updated.deletedAt?.toISOString() ?? null,
+    } as any,
+  };
+  void publishThreadEvent(threadId.data, wsPayload);
+  return res.json({ ok: true });
+});
+
+dmRouter.delete("/threads/:threadId/messages/:messageId", async (req, res) => {
+  const userId = req.userId!;
+  const threadId = z.string().uuid().safeParse(req.params.threadId);
+  const messageId = z.string().uuid().safeParse(req.params.messageId);
+  if (!threadId.success) return res.status(400).json({ error: "invalid_thread_id" });
+  if (!messageId.success) return res.status(400).json({ error: "invalid_message_id" });
+
+  const participant = await prisma.dmParticipant.findUnique({
+    where: { threadId_userId: { threadId: threadId.data, userId } },
+    select: { userId: true },
+  });
+  if (!participant) return res.status(403).json({ error: "not_in_thread" });
+
+  const msg = await prisma.message.findUnique({
+    where: { id: messageId.data },
+    select: { id: true, threadId: true, senderId: true, deletedAt: true, createdAt: true },
+  });
+  if (!msg || msg.threadId !== threadId.data) return res.status(404).json({ error: "message_not_found" });
+  if (msg.deletedAt) return res.status(204).end();
+  if (msg.senderId !== userId) return res.status(403).json({ error: "not_message_author" });
+
+  const updated = await prisma.message.update({
+    where: { id: msg.id },
+    data: { deletedAt: new Date(), deletedById: userId },
+  });
+
+  const wsPayload: WsServerMessage = {
+    type: "message.updated" as any,
+    message: {
+      id: updated.id,
+      threadId: updated.threadId,
+      senderId: updated.senderId,
+      body: "",
+      createdAt: updated.createdAt.toISOString(),
+      editedAt: updated.editedAt?.toISOString() ?? null,
+      deletedAt: updated.deletedAt?.toISOString() ?? null,
+    } as any,
+  };
+  void publishThreadEvent(threadId.data, wsPayload);
+  return res.status(204).end();
+});
+
+const reactionSchema = z.object({ emoji: z.string().min(1).max(32) });
+dmRouter.post("/threads/:threadId/messages/:messageId/reactions", async (req, res) => {
+  const userId = req.userId!;
+  const threadId = z.string().uuid().safeParse(req.params.threadId);
+  const messageId = z.string().uuid().safeParse(req.params.messageId);
+  if (!threadId.success) return res.status(400).json({ error: "invalid_thread_id" });
+  if (!messageId.success) return res.status(400).json({ error: "invalid_message_id" });
+  const parsed = reactionSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
+
+  const participant = await prisma.dmParticipant.findUnique({
+    where: { threadId_userId: { threadId: threadId.data, userId } },
+    select: { userId: true },
+  });
+  if (!participant) return res.status(403).json({ error: "not_in_thread" });
+
+  const msg = await prisma.message.findUnique({ where: { id: messageId.data }, select: { id: true, threadId: true, deletedAt: true } });
+  if (!msg || msg.threadId !== threadId.data) return res.status(404).json({ error: "message_not_found" });
+  if (msg.deletedAt) return res.status(409).json({ error: "message_deleted" });
+
+  try {
+    await prisma.messageReaction.create({ data: { messageId: msg.id, userId, emoji: parsed.data.emoji } });
+  } catch {
+    // already reacted
+  }
+
+  const wsPayload: WsServerMessage = { type: "reaction.updated" as any, scope: "dm", threadId: threadId.data, messageId: msg.id, emoji: parsed.data.emoji } as any;
+  void publishThreadEvent(threadId.data, wsPayload);
+  return res.status(201).json({ ok: true });
+});
+
+dmRouter.delete("/threads/:threadId/messages/:messageId/reactions", async (req, res) => {
+  const userId = req.userId!;
+  const threadId = z.string().uuid().safeParse(req.params.threadId);
+  const messageId = z.string().uuid().safeParse(req.params.messageId);
+  if (!threadId.success) return res.status(400).json({ error: "invalid_thread_id" });
+  if (!messageId.success) return res.status(400).json({ error: "invalid_message_id" });
+  const emoji = z.string().min(1).max(32).safeParse(req.query.emoji);
+  if (!emoji.success) return res.status(400).json({ error: "invalid_emoji" });
+
+  const participant = await prisma.dmParticipant.findUnique({
+    where: { threadId_userId: { threadId: threadId.data, userId } },
+    select: { userId: true },
+  });
+  if (!participant) return res.status(403).json({ error: "not_in_thread" });
+
+  await prisma.messageReaction.deleteMany({ where: { messageId: messageId.data, userId, emoji: emoji.data } });
+  const wsPayload: WsServerMessage = { type: "reaction.updated" as any, scope: "dm", threadId: threadId.data, messageId: messageId.data, emoji: emoji.data } as any;
+  void publishThreadEvent(threadId.data, wsPayload);
+  return res.status(204).end();
+});
+
+dmRouter.post("/threads/:threadId/read", async (req, res) => {
+  const userId = req.userId!;
+  const threadId = z.string().uuid().safeParse(req.params.threadId);
+  if (!threadId.success) return res.status(400).json({ error: "invalid_thread_id" });
+
+  const participant = await prisma.dmParticipant.findUnique({
+    where: { threadId_userId: { threadId: threadId.data, userId } },
+    select: { userId: true },
+  });
+  if (!participant) return res.status(403).json({ error: "not_in_thread" });
+
+  const lastReadAt = new Date();
+  await prisma.dmReadState.upsert({
+    where: { threadId_userId: { threadId: threadId.data, userId } },
+    create: { threadId: threadId.data, userId, lastReadAt },
+    update: { lastReadAt },
+  });
+
+  const wsPayload: WsServerMessage = { type: "readState.updated" as any, scope: "dm", threadId: threadId.data, userId, lastReadAt: lastReadAt.toISOString() } as any;
+  void publishThreadEvent(threadId.data, wsPayload);
+  return res.status(204).end();
 });
 

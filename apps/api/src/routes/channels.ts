@@ -5,6 +5,11 @@ import { requireAuth } from "../auth.js";
 import { publishChannelEvent } from "../ws/realtime.js";
 import type { WsServerMessage } from "@nottermost/shared";
 
+function extractMentions(body: string) {
+  const matches = body.match(/@[^\s@]+@[^\s@]+\.[^\s@]+/g) ?? [];
+  return Array.from(new Set(matches.map((m) => m.slice(1).toLowerCase())));
+}
+
 export const channelsRouter = Router();
 channelsRouter.use(requireAuth);
 
@@ -13,6 +18,25 @@ async function requireWorkspaceMember(workspaceId: string, userId: string) {
     where: { workspaceId_userId: { workspaceId, userId } },
     select: { workspaceId: true, role: true },
   });
+}
+
+async function requireChannelMember(channelId: string, userId: string) {
+  const channel = await prisma.channel.findUnique({
+    where: { id: channelId },
+    select: { id: true, workspaceId: true },
+  });
+  if (!channel) return { ok: false as const, status: 404, error: "channel_not_found" as const };
+
+  const wsMembership = await requireWorkspaceMember(channel.workspaceId, userId);
+  if (!wsMembership) return { ok: false as const, status: 403, error: "not_a_member" as const };
+
+  const member = await prisma.channelMember.findUnique({
+    where: { channelId_userId: { channelId: channel.id, userId } },
+    select: { userId: true },
+  });
+  if (!member) return { ok: false as const, status: 403, error: "not_in_channel" as const };
+
+  return { ok: true as const, channel };
 }
 
 channelsRouter.get("/", async (req, res) => {
@@ -264,20 +288,9 @@ channelsRouter.get("/:id/messages", async (req, res) => {
   const cursor = cursorRaw ? decodeCursor(cursorRaw) : null;
   if (cursorRaw && !cursor) return res.status(400).json({ error: "invalid_cursor" });
 
-  const channel = await prisma.channel.findUnique({
-    where: { id: channelId.data },
-    select: { id: true, workspaceId: true, isPrivate: true },
-  });
-  if (!channel) return res.status(404).json({ error: "channel_not_found" });
-
-  const wsMembership = await requireWorkspaceMember(channel.workspaceId, userId);
-  if (!wsMembership) return res.status(403).json({ error: "not_a_member" });
-
-  const member = await prisma.channelMember.findUnique({
-    where: { channelId_userId: { channelId: channel.id, userId } },
-    select: { userId: true },
-  });
-  if (!member) return res.status(403).json({ error: "not_in_channel" });
+  const access = await requireChannelMember(channelId.data, userId);
+  if (!access.ok) return res.status(access.status).json({ error: access.error });
+  const { channel } = access;
 
   const where =
     cursor && cursor.createdAt && cursor.id
@@ -340,20 +353,9 @@ channelsRouter.get("/:id/threads/:rootMessageId/messages", async (req, res) => {
   const cursor = cursorRaw ? decodeCursor(cursorRaw) : null;
   if (cursorRaw && !cursor) return res.status(400).json({ error: "invalid_cursor" });
 
-  const channel = await prisma.channel.findUnique({
-    where: { id: channelId.data },
-    select: { id: true, workspaceId: true },
-  });
-  if (!channel) return res.status(404).json({ error: "channel_not_found" });
-
-  const wsMembership = await requireWorkspaceMember(channel.workspaceId, userId);
-  if (!wsMembership) return res.status(403).json({ error: "not_a_member" });
-
-  const member = await prisma.channelMember.findUnique({
-    where: { channelId_userId: { channelId: channel.id, userId } },
-    select: { userId: true },
-  });
-  if (!member) return res.status(403).json({ error: "not_in_channel" });
+  const access = await requireChannelMember(channelId.data, userId);
+  if (!access.ok) return res.status(access.status).json({ error: access.error });
+  const { channel } = access;
 
   const root = await prisma.channelMessage.findUnique({
     where: { id: rootId.data },
@@ -408,20 +410,9 @@ channelsRouter.post("/:id/messages", async (req, res) => {
   const parsed = createMessageSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
 
-  const channel = await prisma.channel.findUnique({
-    where: { id: channelId.data },
-    select: { id: true, workspaceId: true },
-  });
-  if (!channel) return res.status(404).json({ error: "channel_not_found" });
-
-  const wsMembership = await requireWorkspaceMember(channel.workspaceId, userId);
-  if (!wsMembership) return res.status(403).json({ error: "not_a_member" });
-
-  const member = await prisma.channelMember.findUnique({
-    where: { channelId_userId: { channelId: channel.id, userId } },
-    select: { userId: true },
-  });
-  if (!member) return res.status(403).json({ error: "not_in_channel" });
+  const access = await requireChannelMember(channelId.data, userId);
+  if (!access.ok) return res.status(access.status).json({ error: access.error });
+  const { channel } = access;
 
   const msg = await prisma.channelMessage.create({
     data: {
@@ -432,6 +423,35 @@ channelsRouter.post("/:id/messages", async (req, res) => {
       replyToId: parsed.data.replyToId,
     },
   });
+
+  // Mentions -> notifications (best-effort).
+  const mentionedEmails = extractMentions(msg.body);
+  if (mentionedEmails.length) {
+    const users = await prisma.user.findMany({
+      where: { email: { in: mentionedEmails } },
+      select: { id: true, email: true },
+    });
+    const wsMembers = await prisma.workspaceMember.findMany({
+      where: { workspaceId: channel.workspaceId, userId: { in: users.map((u) => u.id) } },
+      select: { userId: true },
+    });
+    const allowed = new Set(wsMembers.map((m) => m.userId));
+    await prisma.notification.createMany({
+      data: users
+        .filter((u) => allowed.has(u.id) && u.id !== userId)
+        .map((u) => ({
+          userId: u.id,
+          kind: "mention",
+          entityType: "channelMessage",
+          entityId: msg.id,
+          fromUserId: userId,
+          workspaceId: channel.workspaceId,
+          channelId: channel.id,
+          snippet: msg.body.slice(0, 140),
+        })),
+      skipDuplicates: true,
+    });
+  }
 
   const wsPayload: WsServerMessage = {
     type: "channelMessage.created",
@@ -454,5 +474,164 @@ channelsRouter.post("/:id/messages", async (req, res) => {
     body: msg.body,
     createdAt: msg.createdAt.toISOString(),
   });
+});
+
+const editChannelMessageSchema = z.object({ body: z.string().min(1).max(4000) });
+channelsRouter.patch("/:channelId/messages/:messageId", async (req, res) => {
+  const userId = req.userId!;
+  const channelId = z.string().uuid().safeParse(req.params.channelId);
+  const messageId = z.string().uuid().safeParse(req.params.messageId);
+  if (!channelId.success) return res.status(400).json({ error: "invalid_channel_id" });
+  if (!messageId.success) return res.status(400).json({ error: "invalid_message_id" });
+
+  const parsed = editChannelMessageSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
+
+  const access = await requireChannelMember(channelId.data, userId);
+  if (!access.ok) return res.status(access.status).json({ error: access.error });
+  const { channel } = access;
+
+  const msg = await prisma.channelMessage.findUnique({
+    where: { id: messageId.data },
+    select: { id: true, channelId: true, senderId: true, deletedAt: true },
+  });
+  if (!msg || msg.channelId !== channel.id) return res.status(404).json({ error: "message_not_found" });
+  if (msg.deletedAt) return res.status(409).json({ error: "message_deleted" });
+  if (msg.senderId !== userId) return res.status(403).json({ error: "not_message_author" });
+
+  const updated = await prisma.channelMessage.update({
+    where: { id: msg.id },
+    data: { body: parsed.data.body, editedAt: new Date() },
+  });
+
+  const wsPayload: WsServerMessage = {
+    type: "channelMessage.updated" as any,
+    message: {
+      id: updated.id,
+      channelId: updated.channelId,
+      senderId: updated.senderId,
+      body: updated.body,
+      createdAt: updated.createdAt.toISOString(),
+      threadRootId: updated.threadRootId ?? null,
+      replyToId: updated.replyToId ?? null,
+      editedAt: updated.editedAt?.toISOString() ?? null,
+      deletedAt: updated.deletedAt?.toISOString() ?? null,
+    } as any,
+  };
+  void publishChannelEvent(channel.id, wsPayload);
+
+  return res.json({ ok: true });
+});
+
+channelsRouter.delete("/:channelId/messages/:messageId", async (req, res) => {
+  const userId = req.userId!;
+  const channelId = z.string().uuid().safeParse(req.params.channelId);
+  const messageId = z.string().uuid().safeParse(req.params.messageId);
+  if (!channelId.success) return res.status(400).json({ error: "invalid_channel_id" });
+  if (!messageId.success) return res.status(400).json({ error: "invalid_message_id" });
+
+  const access = await requireChannelMember(channelId.data, userId);
+  if (!access.ok) return res.status(access.status).json({ error: access.error });
+  const { channel } = access;
+
+  const msg = await prisma.channelMessage.findUnique({
+    where: { id: messageId.data },
+    select: { id: true, channelId: true, senderId: true, deletedAt: true, threadRootId: true, replyToId: true, createdAt: true },
+  });
+  if (!msg || msg.channelId !== channel.id) return res.status(404).json({ error: "message_not_found" });
+  if (msg.deletedAt) return res.status(204).end();
+  if (msg.senderId !== userId) return res.status(403).json({ error: "not_message_author" });
+
+  const updated = await prisma.channelMessage.update({
+    where: { id: msg.id },
+    data: { deletedAt: new Date(), deletedById: userId },
+  });
+
+  const wsPayload: WsServerMessage = {
+    type: "channelMessage.updated" as any,
+    message: {
+      id: updated.id,
+      channelId: updated.channelId,
+      senderId: updated.senderId,
+      body: "",
+      createdAt: updated.createdAt.toISOString(),
+      threadRootId: updated.threadRootId ?? null,
+      replyToId: updated.replyToId ?? null,
+      editedAt: updated.editedAt?.toISOString() ?? null,
+      deletedAt: updated.deletedAt?.toISOString() ?? null,
+    } as any,
+  };
+  void publishChannelEvent(channel.id, wsPayload);
+
+  return res.status(204).end();
+});
+
+const reactionSchema = z.object({ emoji: z.string().min(1).max(32) });
+channelsRouter.post("/:channelId/messages/:messageId/reactions", async (req, res) => {
+  const userId = req.userId!;
+  const channelId = z.string().uuid().safeParse(req.params.channelId);
+  const messageId = z.string().uuid().safeParse(req.params.messageId);
+  if (!channelId.success) return res.status(400).json({ error: "invalid_channel_id" });
+  if (!messageId.success) return res.status(400).json({ error: "invalid_message_id" });
+  const parsed = reactionSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
+
+  const access = await requireChannelMember(channelId.data, userId);
+  if (!access.ok) return res.status(access.status).json({ error: access.error });
+  const { channel } = access;
+
+  const msg = await prisma.channelMessage.findUnique({ where: { id: messageId.data }, select: { id: true, channelId: true, deletedAt: true } });
+  if (!msg || msg.channelId !== channel.id) return res.status(404).json({ error: "message_not_found" });
+  if (msg.deletedAt) return res.status(409).json({ error: "message_deleted" });
+
+  try {
+    await prisma.channelMessageReaction.create({ data: { messageId: msg.id, userId, emoji: parsed.data.emoji } });
+  } catch {
+    // already reacted
+  }
+
+  const wsPayload: WsServerMessage = { type: "reaction.updated" as any, scope: "channel", channelId: channel.id, messageId: msg.id, emoji: parsed.data.emoji } as any;
+  void publishChannelEvent(channel.id, wsPayload);
+  return res.status(201).json({ ok: true });
+});
+
+channelsRouter.delete("/:channelId/messages/:messageId/reactions", async (req, res) => {
+  const userId = req.userId!;
+  const channelId = z.string().uuid().safeParse(req.params.channelId);
+  const messageId = z.string().uuid().safeParse(req.params.messageId);
+  if (!channelId.success) return res.status(400).json({ error: "invalid_channel_id" });
+  if (!messageId.success) return res.status(400).json({ error: "invalid_message_id" });
+  const emoji = z.string().min(1).max(32).safeParse(req.query.emoji);
+  if (!emoji.success) return res.status(400).json({ error: "invalid_emoji" });
+
+  const access = await requireChannelMember(channelId.data, userId);
+  if (!access.ok) return res.status(access.status).json({ error: access.error });
+  const { channel } = access;
+
+  await prisma.channelMessageReaction.deleteMany({ where: { messageId: messageId.data, userId, emoji: emoji.data } });
+  const wsPayload: WsServerMessage = { type: "reaction.updated" as any, scope: "channel", channelId: channel.id, messageId: messageId.data, emoji: emoji.data } as any;
+  void publishChannelEvent(channel.id, wsPayload);
+  return res.status(204).end();
+});
+
+channelsRouter.post("/:channelId/read", async (req, res) => {
+  const userId = req.userId!;
+  const channelId = z.string().uuid().safeParse(req.params.channelId);
+  if (!channelId.success) return res.status(400).json({ error: "invalid_channel_id" });
+
+  const access = await requireChannelMember(channelId.data, userId);
+  if (!access.ok) return res.status(access.status).json({ error: access.error });
+  const { channel } = access;
+
+  const lastReadAt = new Date();
+  await prisma.channelReadState.upsert({
+    where: { channelId_userId: { channelId: channel.id, userId } },
+    create: { channelId: channel.id, userId, lastReadAt },
+    update: { lastReadAt },
+  });
+
+  const wsPayload: WsServerMessage = { type: "readState.updated" as any, scope: "channel", channelId: channel.id, userId, lastReadAt: lastReadAt.toISOString() } as any;
+  void publishChannelEvent(channel.id, wsPayload);
+  return res.status(204).end();
 });
 

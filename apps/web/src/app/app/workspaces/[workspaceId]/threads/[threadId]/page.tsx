@@ -20,6 +20,7 @@ export default function ThreadPage() {
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
 
   async function loadFirstPage() {
     const page = await apiFetch<CursorPage<Message>>(`/dm/threads/${threadId}/messages?limit=30`);
@@ -73,6 +74,17 @@ export default function ThreadPage() {
             setMessages((prev) => {
               if (prev.some((m) => m.id === msg!.message.id)) return prev;
               return [...prev, msg!.message];
+            });
+          }
+          if (msg.type === "message.updated" && msg.message.threadId === threadId) {
+            setMessages((prev) => prev.map((m) => (m.id === msg!.message.id ? { ...m, ...msg!.message } : m)));
+          }
+          if (msg.type === "typing.updated" && msg.scope === "dm" && msg.threadId === threadId) {
+            setTypingUsers((prev) => {
+              const next = new Set(prev);
+              if (msg.isTyping) next.add(msg.userId);
+              else next.delete(msg.userId);
+              return next;
             });
           }
         });
@@ -171,11 +183,31 @@ export default function ThreadPage() {
               if (!form) return;
               form.requestSubmit();
             }}
+            onFocus={() => {
+              try {
+                wsRef.current?.send(JSON.stringify({ type: "typing.start", scope: "dm", threadId } satisfies WsClientMessage));
+              } catch {
+                // ignore
+              }
+            }}
+            onBlur={() => {
+              try {
+                wsRef.current?.send(JSON.stringify({ type: "typing.stop", scope: "dm", threadId } satisfies WsClientMessage));
+              } catch {
+                // ignore
+              }
+            }}
           />
           <Button type="submit" disabled={!body.trim()}>
             Send
           </Button>
         </form>
+
+        {typingUsers.size ? (
+          <div className="muted" style={{ fontSize: 12 }}>
+            Typing: {Array.from(typingUsers).join(", ")}
+          </div>
+        ) : null}
       </div>
     </div>
   );

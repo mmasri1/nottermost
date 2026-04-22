@@ -20,6 +20,15 @@ model User {
   sentChannelMessages ChannelMessage[]
   sentChannelInvites  ChannelInvite[] @relation("ChannelInvitesSent")
   receivedChannelInvites ChannelInvite[] @relation("ChannelInvitesReceived")
+
+  deletedDmMessages Message[] @relation("DmMessagesDeletedBy")
+  deletedChannelMessages ChannelMessage[] @relation("ChannelMessagesDeletedBy")
+  dmReadStates DmReadState[]
+  channelReadStates ChannelReadState[]
+  notifications Notification[]
+
+  messageReactions MessageReaction[]
+  channelMessageReactions ChannelMessageReaction[]
 }
 
 model Workspace {
@@ -77,6 +86,7 @@ model DmThread {
   workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   participants  DmParticipant[]
   messages      Message[]
+  readStates    DmReadState[]
 
   @@index([workspaceId, createdAt])
   @@unique([workspaceId, directUserAId, directUserBId])
@@ -101,11 +111,44 @@ model Message {
   senderId  String
   body      String
   createdAt DateTime @default(now())
+  editedAt  DateTime?
+  deletedAt DateTime?
+  deletedById String?
 
   thread    DmThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
   sender    User         @relation(fields: [senderId], references: [id], onDelete: Restrict)
+  deletedBy User? @relation("DmMessagesDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+
+  reactions MessageReaction[]
 
   @@index([threadId, createdAt])
+  @@index([deletedAt])
+}
+
+model MessageReaction {
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, userId, emoji])
+  @@index([userId])
+}
+
+model DmReadState {
+  threadId String
+  userId   String
+  lastReadAt DateTime @default(now())
+  lastReadMessageId String?
+
+  thread DmThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([threadId, userId])
+  @@index([userId])
 }
 
 model Channel {
@@ -119,6 +162,7 @@ model Channel {
   members     ChannelMember[]
   invites     ChannelInvite[]
   messages    ChannelMessage[]
+  readStates  ChannelReadState[]
 
   @@index([workspaceId])
   @@unique([workspaceId, name])
@@ -158,6 +202,9 @@ model ChannelMessage {
   senderId  String
   body      String
   createdAt DateTime @default(now())
+  editedAt  DateTime?
+  deletedAt DateTime?
+  deletedById String?
 
   // Threading: root messages have threadRootId = null; replies set threadRootId to the root message id.
   threadRootId String?
@@ -171,8 +218,72 @@ model ChannelMessage {
 
   channel   Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
   sender    User    @relation(fields: [senderId], references: [id], onDelete: Restrict)
+  deletedBy User? @relation("ChannelMessagesDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+
+  reactions ChannelMessageReaction[]
 
   @@index([channelId, createdAt])
   @@index([threadRootId, createdAt])
+  @@index([deletedAt])
+}
+
+model ChannelMessageReaction {
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  message   ChannelMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, userId, emoji])
+  @@index([userId])
+}
+
+model ChannelReadState {
+  channelId String
+  userId    String
+  lastReadAt DateTime @default(now())
+  lastReadMessageId String?
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([channelId, userId])
+  @@index([userId])
+}
+
+enum NotificationKind {
+  mention
+  thread_reply
+  message_reaction
+}
+
+enum NotificationEntityType {
+  channelMessage
+  dmMessage
+  channelThread
+  dmThread
+}
+
+model Notification {
+  id        String @id @default(uuid())
+  userId    String
+  kind      NotificationKind
+  entityType NotificationEntityType
+  entityId  String
+  createdAt DateTime @default(now())
+  readAt    DateTime?
+
+  fromUserId String?
+  workspaceId String?
+  channelId  String?
+  threadId   String?
+  snippet    String?
+
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([workspaceId, createdAt])
 }
 

@@ -25,6 +25,7 @@ export default function ChannelPage() {
   const [threadMessages, setThreadMessages] = useState<ChannelMessage[]>([]);
   const [threadCursor, setThreadCursor] = useState<string | null>(null);
   const [threadBody, setThreadBody] = useState("");
+  const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
 
   async function loadFirstPage() {
     const page = await apiFetch<CursorPage<ChannelMessage>>(`/channels/${channelId}/messages?limit=30`);
@@ -81,6 +82,22 @@ export default function ChannelPage() {
           } catch {
             return;
           }
+          if (msg.type === "typing.updated" && msg.scope === "channel" && msg.channelId === channelId) {
+            setTypingUsers((prev) => {
+              const next = new Set(prev);
+              if (msg.isTyping) next.add(msg.userId);
+              else next.delete(msg.userId);
+              return next;
+            });
+            return;
+          }
+
+          if (msg.type === "channelMessage.updated" && msg.message.channelId === channelId) {
+            setMessages((prev) => prev.map((m) => (m.id === msg!.message.id ? { ...m, ...msg!.message } : m)));
+            setThreadMessages((prev) => prev.map((m) => (m.id === msg!.message.id ? { ...m, ...msg!.message } : m)));
+            return;
+          }
+
           if (msg.type !== "channelMessage.created") return;
           if (msg.message.channelId !== channelId) return;
 
@@ -305,11 +322,35 @@ export default function ChannelPage() {
               if (!form) return;
               form.requestSubmit();
             }}
+            onFocus={() => {
+              try {
+                wsRef.current?.send(
+                  JSON.stringify({ type: "typing.start", scope: "channel", channelId } satisfies WsClientMessage),
+                );
+              } catch {
+                // ignore
+              }
+            }}
+            onBlur={() => {
+              try {
+                wsRef.current?.send(
+                  JSON.stringify({ type: "typing.stop", scope: "channel", channelId } satisfies WsClientMessage),
+                );
+              } catch {
+                // ignore
+              }
+            }}
           />
           <Button type="submit" disabled={!body.trim()}>
             Send
           </Button>
         </form>
+
+        {typingUsers.size ? (
+          <div className="muted" style={{ fontSize: 12 }}>
+            Typing: {Array.from(typingUsers).join(", ")}
+          </div>
+        ) : null}
 
         <div style={{ height: 1, background: "rgba(17,24,39,0.08)" }} />
 

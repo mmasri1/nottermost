@@ -11,6 +11,11 @@ type WsClient = {
   ws: import("ws").WebSocket;
   subscribedThreadIds: Set<string>;
   subscribedChannelIds: Set<string>;
+  typing: {
+    channelIds: Set<string>;
+    threadIds: Set<string>;
+  };
+  lastPresencePingAt: number;
 };
 
 const clients = new Set<WsClient>();
@@ -44,6 +49,18 @@ export function createHttpServerWithWs(app: Express) {
     }
   });
 
+  function broadcast(payload: WsServerMessage) {
+    for (const c of clients) safeSend(c.ws, payload);
+  }
+
+  function broadcastTyping(args: { scope: "channel" | "dm"; channelId?: string; threadId?: string; userId: string; isTyping: boolean }) {
+    const payload: WsServerMessage = { type: "typing.updated", ...args } as WsServerMessage;
+    for (const c of clients) {
+      if (args.scope === "channel" && args.channelId && c.subscribedChannelIds.has(args.channelId)) safeSend(c.ws, payload);
+      if (args.scope === "dm" && args.threadId && c.subscribedThreadIds.has(args.threadId)) safeSend(c.ws, payload);
+    }
+  }
+
   wss.on("connection", (ws, req) => {
     const userId = parseAuthUserId(req.url);
     if (!userId) {
@@ -51,9 +68,17 @@ export function createHttpServerWithWs(app: Express) {
       return;
     }
 
-    const client: WsClient = { userId, ws, subscribedThreadIds: new Set(), subscribedChannelIds: new Set() };
+    const client: WsClient = {
+      userId,
+      ws,
+      subscribedThreadIds: new Set(),
+      subscribedChannelIds: new Set(),
+      typing: { channelIds: new Set(), threadIds: new Set() },
+      lastPresencePingAt: Date.now(),
+    };
     clients.add(client);
     safeSend(ws, { type: "ready" });
+    broadcast({ type: "presence.updated", userId, status: "online", lastSeenAt: new Date().toISOString() } as WsServerMessage);
 
     ws.on("message", (raw) => {
       let msg: WsClientMessage | null = null;
@@ -67,10 +92,33 @@ export function createHttpServerWithWs(app: Express) {
       if (msg.type === "unsubscribe.thread") client.subscribedThreadIds.delete(msg.threadId);
       if (msg.type === "subscribe.channel") client.subscribedChannelIds.add(msg.channelId);
       if (msg.type === "unsubscribe.channel") client.subscribedChannelIds.delete(msg.channelId);
+
+      if (msg.type === "typing.start" && msg.scope === "channel") {
+        client.typing.channelIds.add(msg.channelId);
+        broadcastTyping({ scope: "channel", channelId: msg.channelId, userId, isTyping: true });
+      }
+      if (msg.type === "typing.stop" && msg.scope === "channel") {
+        client.typing.channelIds.delete(msg.channelId);
+        broadcastTyping({ scope: "channel", channelId: msg.channelId, userId, isTyping: false });
+      }
+      if (msg.type === "typing.start" && msg.scope === "dm") {
+        client.typing.threadIds.add(msg.threadId);
+        broadcastTyping({ scope: "dm", threadId: msg.threadId, userId, isTyping: true });
+      }
+      if (msg.type === "typing.stop" && msg.scope === "dm") {
+        client.typing.threadIds.delete(msg.threadId);
+        broadcastTyping({ scope: "dm", threadId: msg.threadId, userId, isTyping: false });
+      }
+
+      if (msg.type === "presence.ping") {
+        client.lastPresencePingAt = Date.now();
+        broadcast({ type: "presence.updated", userId, status: "online", lastSeenAt: new Date().toISOString() } as WsServerMessage);
+      }
     });
 
     ws.on("close", () => {
       clients.delete(client);
+      broadcast({ type: "presence.updated", userId, status: "offline", lastSeenAt: new Date().toISOString() } as WsServerMessage);
     });
   });
 

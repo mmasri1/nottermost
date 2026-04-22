@@ -18,6 +18,8 @@ type DmThreadListItem = {
   lastMessageAt: string | null;
 };
 
+type NotifList = { items: Array<{ id: string; readAt: string | null }>; nextCursor: string | null };
+
 export default function WorkspaceLayout({ children }: { children: ReactNode }) {
   const params = useParams<{ workspaceId: string }>();
   const workspaceId = useMemo(() => params.workspaceId, [params.workspaceId]);
@@ -27,6 +29,7 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
   const [dmThreads, setDmThreads] = useState<DmThreadListItem[]>([]);
   const [me, setMe] = useState<{ id: string; email: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [unreadNotifs, setUnreadNotifs] = useState<number>(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,11 +42,13 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
           apiFetch<Member[]>(`/workspaces/${workspaceId}/members`),
         ]);
         const dmResp = await apiFetch<DmThreadListItem[]>(`/dm/threads?workspaceId=${encodeURIComponent(workspaceId)}`);
+        const notifResp = await apiFetch<NotifList>(`/notifications?workspaceId=${encodeURIComponent(workspaceId)}&limit=50`);
         if (cancelled) return;
         setMe(meResp);
         setChannels(chansResp);
         setMembers(memResp);
         setDmThreads(dmResp);
+        setUnreadNotifs(notifResp.items.filter((n) => !n.readAt).length);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "load_failed");
       }
@@ -90,7 +95,7 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
         <div className="topbar">
           <div className="topbarLeft">{error ? <span className="topbarError">Error: {error}</span> : null}</div>
           <div className="topbarRight">
-            <span className="topbarHint">Light mode · Slack-like layout</span>
+            <span className="topbarHint">Notifications: {unreadNotifs} unread</span>
           </div>
         </div>
       }
