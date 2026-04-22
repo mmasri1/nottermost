@@ -36,6 +36,10 @@ The format is based on **Keep a Changelog**, and this project aims to follow **S
   - Prisma fields on `User` for display name, avatar URL, and status text
   - `PATCH /workspaces/me/profile` plus profile fields on `GET /workspaces/me` and workspace member listings
   - Web workspace profile page + sidebar header display
+- Mentions and notification preferences:
+  - Channel mentions: `@local@domain.tld`, `@channel` / `@here`, and `#channel-name` (cross-channel, membership-aware)
+  - Per-workspace toggles on `WorkspaceMember` with `GET/PATCH /workspaces/:id/me/notification-prefs`
+  - Web: workspace profile page includes mention help + notification checkboxes
 - Documentation/meta:
   - Repository policies: `CONTRIBUTING.md`, `SECURITY.md`, `SUPPORT.md`, `CODE_OF_CONDUCT.md`
   - GitHub templates: issue templates + PR template

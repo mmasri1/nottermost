@@ -121,6 +121,59 @@ workspacesRouter.post("/", async (req, res) => {
   });
 });
 
+const notifPrefsSchema = z.object({
+  notifyChannelMentions: z.boolean().optional(),
+  notifyDmMentions: z.boolean().optional(),
+});
+
+workspacesRouter.get("/:id/me/notification-prefs", async (req, res) => {
+  const userId = req.userId!;
+  const workspaceId = z.string().uuid().safeParse(req.params.id);
+  if (!workspaceId.success) return res.status(400).json({ error: "invalid_workspace_id" });
+
+  const membership = await prisma.workspaceMember.findUnique({
+    where: { workspaceId_userId: { workspaceId: workspaceId.data, userId } },
+    select: { notifyChannelMentions: true, notifyDmMentions: true },
+  });
+  if (!membership) return res.status(403).json({ error: "not_a_member" });
+
+  return res.json({
+    notifyChannelMentions: membership.notifyChannelMentions,
+    notifyDmMentions: membership.notifyDmMentions,
+  });
+});
+
+workspacesRouter.patch("/:id/me/notification-prefs", async (req, res) => {
+  const userId = req.userId!;
+  const workspaceId = z.string().uuid().safeParse(req.params.id);
+  if (!workspaceId.success) return res.status(400).json({ error: "invalid_workspace_id" });
+
+  const membership = await prisma.workspaceMember.findUnique({
+    where: { workspaceId_userId: { workspaceId: workspaceId.data, userId } },
+    select: { workspaceId: true },
+  });
+  if (!membership) return res.status(403).json({ error: "not_a_member" });
+
+  const parsed = notifPrefsSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
+
+  const data: { notifyChannelMentions?: boolean; notifyDmMentions?: boolean } = {};
+  if (parsed.data.notifyChannelMentions !== undefined) data.notifyChannelMentions = parsed.data.notifyChannelMentions;
+  if (parsed.data.notifyDmMentions !== undefined) data.notifyDmMentions = parsed.data.notifyDmMentions;
+  if (!Object.keys(data).length) return res.status(400).json({ error: "empty_patch" });
+
+  const updated = await prisma.workspaceMember.update({
+    where: { workspaceId_userId: { workspaceId: workspaceId.data, userId } },
+    data,
+    select: { notifyChannelMentions: true, notifyDmMentions: true },
+  });
+
+  return res.json({
+    notifyChannelMentions: updated.notifyChannelMentions,
+    notifyDmMentions: updated.notifyDmMentions,
+  });
+});
+
 workspacesRouter.get("/:id/members", async (req, res) => {
   const userId = req.userId!;
   const workspaceId = z.string().uuid().safeParse(req.params.id);

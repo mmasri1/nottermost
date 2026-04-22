@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth.js";
 
@@ -30,7 +31,7 @@ notificationsRouter.get("/", async (req, res) => {
   const cursor = cursorRaw ? decodeCursor(cursorRaw) : null;
   if (cursorRaw && !cursor) return res.status(400).json({ error: "invalid_cursor" });
 
-  const where: any = { userId };
+  const where: Prisma.NotificationWhereInput = { userId };
   if (workspaceId.data) where.workspaceId = workspaceId.data;
   if (cursor) {
     where.OR = [

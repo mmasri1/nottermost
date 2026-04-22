@@ -4,11 +4,7 @@ import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth.js";
 import { publishChannelEvent } from "../ws/realtime.js";
 import type { WsServerMessage } from "@nottermost/shared";
-
-function extractMentions(body: string) {
-  const matches = body.match(/@[^\s@]+@[^\s@]+\.[^\s@]+/g) ?? [];
-  return Array.from(new Set(matches.map((m) => m.slice(1).toLowerCase())));
-}
+import { filterUsersAllowingChannelMentions, resolveChannelMentionRecipientIds } from "../mentionTargets.js";
 
 export const channelsRouter = Router();
 channelsRouter.use(requireAuth);
@@ -442,31 +438,25 @@ channelsRouter.post("/:id/messages", async (req, res) => {
   }
 
   // Mentions -> notifications (best-effort).
-  const mentionedEmails = extractMentions(msg.body);
-  if (mentionedEmails.length) {
-    const users = await prisma.user.findMany({
-      where: { email: { in: mentionedEmails } },
-      select: { id: true, email: true },
-    });
-    const wsMembers = await prisma.workspaceMember.findMany({
-      where: { workspaceId: channel.workspaceId, userId: { in: users.map((u) => u.id) } },
-      select: { userId: true },
-    });
-    const allowed = new Set(wsMembers.map((m) => m.userId));
+  const mentionRecipients = await resolveChannelMentionRecipientIds({
+    body: msg.body,
+    channelId: channel.id,
+    workspaceId: channel.workspaceId,
+    senderId: userId,
+  });
+  const allowedRecipients = await filterUsersAllowingChannelMentions(channel.workspaceId, mentionRecipients);
+  if (allowedRecipients.length) {
     await prisma.notification.createMany({
-      data: users
-        .filter((u) => allowed.has(u.id) && u.id !== userId)
-        .map((u) => ({
-          userId: u.id,
-          kind: "mention",
-          entityType: "channelMessage",
-          entityId: msg.id,
-          fromUserId: userId,
-          workspaceId: channel.workspaceId,
-          channelId: channel.id,
-          snippet: msg.body.slice(0, 140),
-        })),
-      skipDuplicates: true,
+      data: allowedRecipients.map((uid) => ({
+        userId: uid,
+        kind: "mention",
+        entityType: "channelMessage",
+        entityId: msg.id,
+        fromUserId: userId,
+        workspaceId: channel.workspaceId,
+        channelId: channel.id,
+        snippet: msg.body.slice(0, 140),
+      })),
     });
   }
 

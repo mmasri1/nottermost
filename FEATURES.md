@@ -48,7 +48,7 @@ This file tracks which features are done, in progress, or not started.
 - [X] Threads / replies (reply-in-thread, thread view, unread thread activity)
 
 ### Messaging UX
-- [ ] Mentions & notifications (`@user`, `@channel`, notification prefs)
+- [X] Mentions & notifications (`@user`, `@channel`, notification prefs)
 - [ ] Reactions, edits, deletes (emoji reactions, edit/delete, pinning, saved items)
 - [X] Typing indicators
 - [ ] Presence

@@ -4,17 +4,13 @@ import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth.js";
 import { publishThreadEvent } from "../ws/realtime.js";
 import type { WsServerMessage } from "@nottermost/shared";
+import { filterUsersAllowingDmMentions, resolveDmMentionRecipientIds } from "../mentionTargets.js";
 
 export const dmRouter = Router();
 dmRouter.use(requireAuth);
 
 function normalizePair(a: string, b: string) {
   return a < b ? [a, b] : [b, a];
-}
-
-function extractMentions(body: string) {
-  const matches = body.match(/@[^\s@]+@[^\s@]+\.[^\s@]+/g) ?? [];
-  return Array.from(new Set(matches.map((m) => m.slice(1).toLowerCase())));
 }
 
 const createThreadSchema = z.union([
@@ -250,7 +246,7 @@ dmRouter.post("/threads/:id/messages", async (req, res) => {
 
   const thread = await prisma.dmThread.findUnique({
     where: { id: threadId.data },
-    select: { id: true },
+    select: { id: true, workspaceId: true },
   });
   if (!thread) return res.status(404).json({ error: "thread_not_found" });
 
@@ -265,49 +261,39 @@ dmRouter.post("/threads/:id/messages", async (req, res) => {
   });
 
   if (parsed.data.fileIds?.length) {
-    const dm = await prisma.dmThread.findUnique({ where: { id: thread.id }, select: { workspaceId: true } });
-    if (dm) {
-      const files = await prisma.fileObject.findMany({
-        where: { id: { in: parsed.data.fileIds }, workspaceId: dm.workspaceId },
-        select: { id: true },
-      });
-      await prisma.dmMessageAttachment.createMany({
-        data: files.map((f) => ({ messageId: msg.id, fileId: f.id })),
-        skipDuplicates: true,
-      });
-      await prisma.fileGrant.createMany({
-        data: files.map((f) => ({ fileId: f.id, kind: "dmThread", threadId: thread.id })),
-        skipDuplicates: true,
-      });
-    }
+    const files = await prisma.fileObject.findMany({
+      where: { id: { in: parsed.data.fileIds }, workspaceId: thread.workspaceId },
+      select: { id: true },
+    });
+    await prisma.dmMessageAttachment.createMany({
+      data: files.map((f) => ({ messageId: msg.id, fileId: f.id })),
+      skipDuplicates: true,
+    });
+    await prisma.fileGrant.createMany({
+      data: files.map((f) => ({ fileId: f.id, kind: "dmThread", threadId: thread.id })),
+      skipDuplicates: true,
+    });
   }
 
   // Mentions -> notifications (best-effort).
-  const mentionedEmails = extractMentions(msg.body);
-  if (mentionedEmails.length) {
-    const users = await prisma.user.findMany({
-      where: { email: { in: mentionedEmails } },
-      select: { id: true },
-    });
-    const allowed = await prisma.dmParticipant.findMany({
-      where: { threadId: thread.id, userId: { in: users.map((u) => u.id) } },
-      select: { userId: true },
-    });
-    const allowedSet = new Set(allowed.map((x) => x.userId));
+  const mentionRecipients = await resolveDmMentionRecipientIds({
+    body: msg.body,
+    threadId: thread.id,
+    senderId: userId,
+  });
+  const allowedRecipients = await filterUsersAllowingDmMentions(thread.workspaceId, mentionRecipients);
+  if (allowedRecipients.length) {
     await prisma.notification.createMany({
-      data: users
-        .filter((u) => allowedSet.has(u.id) && u.id !== userId)
-        .map((u) => ({
-          userId: u.id,
-          kind: "mention",
-          entityType: "dmMessage",
-          entityId: msg.id,
-          fromUserId: userId,
-          workspaceId: null,
-          threadId: thread.id,
-          snippet: msg.body.slice(0, 140),
-        })),
-      skipDuplicates: true,
+      data: allowedRecipients.map((uid) => ({
+        userId: uid,
+        kind: "mention",
+        entityType: "dmMessage",
+        entityId: msg.id,
+        fromUserId: userId,
+        workspaceId: thread.workspaceId,
+        threadId: thread.id,
+        snippet: msg.body.slice(0, 140),
+      })),
     });
   }
 
