@@ -1,0 +1,27 @@
+.git
+.github
+.cursor
+.vscode
+
+# logs / temp
+**/*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+Thumbs.db
+
+# dependencies / build outputs (massive, never needed for docker build context)
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+**/.cache
+**/.eslintcache
+**/*.tsbuildinfo
+
+# local env / secrets
+.env
+
+# docker artifacts
+**/*-debug.log
