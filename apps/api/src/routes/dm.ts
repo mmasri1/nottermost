@@ -165,7 +165,10 @@ dmRouter.get("/threads", async (req, res) => {
   );
 });
 
-const createMessageSchema = z.object({ body: z.string().min(1).max(4000) });
+const createMessageSchema = z.object({
+  body: z.string().min(1).max(4000),
+  fileIds: z.array(z.string().uuid()).max(10).optional(),
+});
 
 type MsgCursor = { createdAt: string; id: string };
 function encodeCursor(c: MsgCursor) {
@@ -260,6 +263,24 @@ dmRouter.post("/threads/:id/messages", async (req, res) => {
   const msg = await prisma.message.create({
     data: { threadId: thread.id, senderId: userId, body: parsed.data.body },
   });
+
+  if (parsed.data.fileIds?.length) {
+    const dm = await prisma.dmThread.findUnique({ where: { id: thread.id }, select: { workspaceId: true } });
+    if (dm) {
+      const files = await prisma.fileObject.findMany({
+        where: { id: { in: parsed.data.fileIds }, workspaceId: dm.workspaceId },
+        select: { id: true },
+      });
+      await prisma.dmMessageAttachment.createMany({
+        data: files.map((f) => ({ messageId: msg.id, fileId: f.id })),
+        skipDuplicates: true,
+      });
+      await prisma.fileGrant.createMany({
+        data: files.map((f) => ({ fileId: f.id, kind: "dmThread", threadId: thread.id })),
+        skipDuplicates: true,
+      });
+    }
+  }
 
   // Mentions -> notifications (best-effort).
   const mentionedEmails = extractMentions(msg.body);

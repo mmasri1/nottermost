@@ -32,6 +32,13 @@ export type Message = {
   createdAt: string;
   editedAt?: string | null;
   deletedAt?: string | null;
+  attachments?: Array<{
+    id: string;
+    filename: string;
+    contentType: string;
+    sizeBytes: number;
+    url: string;
+  }>;
 };
 
 export type Channel = {
@@ -75,6 +82,13 @@ export type ChannelMessage = {
   lastReplyAt?: string | null;
   editedAt?: string | null;
   deletedAt?: string | null;
+  attachments?: Array<{
+    id: string;
+    filename: string;
+    contentType: string;
+    sizeBytes: number;
+    url: string;
+  }>;
 };
 
 export type CursorPage<T> = {

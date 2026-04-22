@@ -262,6 +262,7 @@ const createMessageSchema = z.object({
   body: z.string().min(1).max(4000),
   threadRootId: z.string().uuid().optional(),
   replyToId: z.string().uuid().optional(),
+  fileIds: z.array(z.string().uuid()).max(10).optional(),
 });
 
 type MsgCursor = { createdAt: string; id: string };
@@ -423,6 +424,22 @@ channelsRouter.post("/:id/messages", async (req, res) => {
       replyToId: parsed.data.replyToId,
     },
   });
+
+  if (parsed.data.fileIds?.length) {
+    const files = await prisma.fileObject.findMany({
+      where: { id: { in: parsed.data.fileIds }, workspaceId: channel.workspaceId },
+      select: { id: true },
+    });
+    await prisma.channelMessageAttachment.createMany({
+      data: files.map((f) => ({ messageId: msg.id, fileId: f.id })),
+      skipDuplicates: true,
+    });
+    // Ensure file grants include this channel.
+    await prisma.fileGrant.createMany({
+      data: files.map((f) => ({ fileId: f.id, kind: "channel", channelId: channel.id })),
+      skipDuplicates: true,
+    });
+  }
 
   // Mentions -> notifications (best-effort).
   const mentionedEmails = extractMentions(msg.body);

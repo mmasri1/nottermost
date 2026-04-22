@@ -44,16 +44,16 @@ This file tracks which features are done, in progress, or not started.
 - [X] Channel list + channel messages
 
 ### Group conversations
-- [ ] Group DMs / multi-person threads
-- [ ] Threads / replies (reply-in-thread, thread view, unread thread activity)
+- [X] Group DMs / multi-person threads
+- [X] Threads / replies (reply-in-thread, thread view, unread thread activity)
 
 ### Messaging UX
 - [ ] Mentions & notifications (`@user`, `@channel`, notification prefs)
 - [ ] Reactions, edits, deletes (emoji reactions, edit/delete, pinning, saved items)
-- [ ] Typing indicators
+- [X] Typing indicators
 - [ ] Presence
 - [ ] Read states (unread counts, read markers, last-read)
-- [ ] Light mode is default
+- [X] Light mode is default
 - [ ] Design exactly like Slack (layout + icons + overall look)
 
 ### Files

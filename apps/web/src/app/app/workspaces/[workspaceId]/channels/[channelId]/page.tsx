@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import type { ChannelMessage, CursorPage, WsClientMessage, WsServerMessage } from "@nottermost/shared";
-import { apiFetch, getToken } from "../../../../../../lib/api";
+import { apiFetch, apiUploadFile, getToken } from "../../../../../../lib/api";
 import { WorkspaceHeader } from "../../../../../../components/AppShell/WorkspaceHeader";
 import { Button } from "../../../../../../components/ui/Button";
 import { Input, TextArea } from "../../../../../../components/ui/Input";
@@ -26,6 +26,10 @@ export default function ChannelPage() {
   const [threadCursor, setThreadCursor] = useState<string | null>(null);
   const [threadBody, setThreadBody] = useState("");
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
+  const [pendingUploads, setPendingUploads] = useState<
+    Array<{ id: string; filename: string; url: string; sizeBytes: number; contentType: string }>
+  >([]);
+  const [uploading, setUploading] = useState(false);
 
   async function loadFirstPage() {
     const page = await apiFetch<CursorPage<ChannelMessage>>(`/channels/${channelId}/messages?limit=30`);
@@ -188,6 +192,15 @@ export default function ChannelPage() {
                   {m.senderId} · {new Date(m.createdAt).toLocaleString()}
                 </div>
                 <div style={{ whiteSpace: "pre-wrap" }}>{m.body}</div>
+                {m.attachments?.length ? (
+                  <div className="col" style={{ gap: 6, marginTop: 6 }}>
+                    {m.attachments.map((a) => (
+                      <a key={a.id} className="uiLink" href={a.url} target="_blank" rel="noreferrer">
+                        {a.filename}
+                      </a>
+                    ))}
+                  </div>
+                ) : null}
                 <div className="row" style={{ gap: 10, marginTop: 4 }}>
                   <Button
                     size="sm"
@@ -298,18 +311,49 @@ export default function ChannelPage() {
             e.preventDefault();
             setError(null);
             const trimmed = body.trim();
-            if (!trimmed) return;
+            if (!trimmed && pendingUploads.length === 0) return;
             setBody("");
             try {
               await apiFetch<ChannelMessage>(`/channels/${channelId}/messages`, {
                 method: "POST",
-                body: JSON.stringify({ body: trimmed }),
+                body: JSON.stringify({ body: trimmed || " ", fileIds: pendingUploads.map((f) => f.id) }),
               });
+              setPendingUploads([]);
             } catch (err) {
               setError(err instanceof Error ? err.message : "send_failed");
             }
           }}
         >
+          <input
+            type="file"
+            multiple
+            disabled={uploading}
+            onChange={async (e) => {
+              const files = Array.from(e.target.files ?? []);
+              if (!files.length) return;
+              e.target.value = "";
+              setUploading(true);
+              try {
+                for (const f of files) {
+                  const uploaded = await apiUploadFile({ workspaceId, channelId, file: f });
+                  setPendingUploads((prev) => [
+                    ...prev,
+                    {
+                      id: uploaded.id,
+                      filename: uploaded.filename,
+                      url: uploaded.url,
+                      sizeBytes: uploaded.sizeBytes,
+                      contentType: uploaded.contentType,
+                    },
+                  ]);
+                }
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "upload_failed");
+              } finally {
+                setUploading(false);
+              }
+            }}
+          />
           <TextArea
             placeholder="Write a message…"
             value={body}
@@ -341,10 +385,33 @@ export default function ChannelPage() {
               }
             }}
           />
-          <Button type="submit" disabled={!body.trim()}>
-            Send
+          <Button type="submit" disabled={uploading || (!body.trim() && pendingUploads.length === 0)}>
+            {uploading ? "Uploading…" : "Send"}
           </Button>
         </form>
+
+        {pendingUploads.length ? (
+          <div className="col" style={{ gap: 6 }}>
+            <div className="muted" style={{ fontSize: 12 }}>
+              Attachments to send
+            </div>
+            {pendingUploads.map((f) => (
+              <div key={f.id} className="row" style={{ justifyContent: "space-between" }}>
+                <a className="uiLink" href={f.url} target="_blank" rel="noreferrer">
+                  {f.filename}
+                </a>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  type="button"
+                  onClick={() => setPendingUploads((p) => p.filter((x) => x.id !== f.id))}
+                >
+                  Remove
+                </Button>
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         {typingUsers.size ? (
           <div className="muted" style={{ fontSize: 12 }}>

@@ -7,6 +7,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().min(1),
   CORS_ORIGIN: z.string().min(1),
+  FILES_DIR: z.string().min(1).default("/app/apps/api/uploads"),
 });
 
 export const env = envSchema.parse(process.env);
