@@ -32,6 +32,7 @@ export type Message = {
   createdAt: string;
   editedAt?: string | null;
   deletedAt?: string | null;
+  reactions?: MessageReactionSummary[];
   attachments?: Array<{
     id: string;
     filename: string;
@@ -70,6 +71,17 @@ export type ChannelInvite = {
   createdAt: string;
 };
 
+export type MessageReactionSummary = {
+  emoji: string;
+  count: number;
+  me: boolean;
+};
+
+export type MessageReactionCount = {
+  emoji: string;
+  count: number;
+};
+
 export type ChannelMessage = {
   id: string;
   channelId: string;
@@ -82,6 +94,7 @@ export type ChannelMessage = {
   lastReplyAt?: string | null;
   editedAt?: string | null;
   deletedAt?: string | null;
+  reactions?: MessageReactionSummary[];
   attachments?: Array<{
     id: string;
     filename: string;
@@ -120,6 +133,9 @@ export type WsServerMessage =
       threadId?: string;
       messageId: string;
       emoji: string;
+      actorUserId: string;
+      delta: "add" | "remove";
+      counts: MessageReactionCount[];
     }
   | {
       type: "typing.updated";

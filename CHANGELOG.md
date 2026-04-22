@@ -36,6 +36,10 @@ The format is based on **Keep a Changelog**, and this project aims to follow **S
   - Prisma fields on `User` for display name, avatar URL, and status text
   - `PATCH /workspaces/me/profile` plus profile fields on `GET /workspaces/me` and workspace member listings
   - Web workspace profile page + sidebar header display
+- Messaging (reactions & message actions):
+  - Channel and DM list APIs include `editedAt`, `deletedAt`, and per-viewer reaction summaries
+  - WebSocket `reaction.updated` carries aggregate counts plus actor/delta for correct multi-client `me` state
+  - Web: channel and DM thread views support quick emoji reactions, edit, soft-delete display, and (edited) markers
 - Mentions and notification preferences:
   - Channel mentions: `@local@domain.tld`, `@channel` / `@here`, and `#channel-name` (cross-channel, membership-aware)
   - Per-workspace toggles on `WorkspaceMember` with `GET/PATCH /workspaces/:id/me/notification-prefs`

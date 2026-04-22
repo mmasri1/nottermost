@@ -5,6 +5,7 @@ import { requireAuth } from "../auth.js";
 import { publishChannelEvent } from "../ws/realtime.js";
 import type { WsServerMessage } from "@nottermost/shared";
 import { filterUsersAllowingChannelMentions, resolveChannelMentionRecipientIds } from "../mentionTargets.js";
+import { channelReactionCountsOnly, channelReactionList, channelReactionMap } from "../reactionSummary.js";
 
 export const channelsRouter = Router();
 channelsRouter.use(requireAuth);
@@ -317,16 +318,24 @@ channelsRouter.get("/:id/messages", async (req, res) => {
   });
   const aggByRoot = new Map(replyAgg.map((a) => [a.threadRootId!, { count: a._count._all, last: a._max.createdAt }]));
 
+  const reactionById = await channelReactionMap(
+    baseItems.map((m) => m.id),
+    userId,
+  );
+
   const items = baseItems.map((m) => {
     const agg = aggByRoot.get(m.id);
     return {
       id: m.id,
       channelId: m.channelId,
       senderId: m.senderId,
-      body: m.body,
+      body: m.deletedAt ? "" : m.body,
       createdAt: m.createdAt.toISOString(),
+      editedAt: m.editedAt?.toISOString() ?? null,
+      deletedAt: m.deletedAt?.toISOString() ?? null,
       replyCount: agg?.count ?? 0,
       lastReplyAt: agg?.last ? agg.last.toISOString() : null,
+      reactions: reactionById.get(m.id) ?? [],
     };
   });
 
@@ -381,14 +390,22 @@ channelsRouter.get("/:id/threads/:rootMessageId/messages", async (req, res) => {
   });
 
   const hasMore = msgs.length > limit;
-  const items = (hasMore ? msgs.slice(0, limit) : msgs).map((m) => ({
+  const slice = hasMore ? msgs.slice(0, limit) : msgs;
+  const reactionById = await channelReactionMap(
+    slice.map((m) => m.id),
+    userId,
+  );
+  const items = slice.map((m) => ({
     id: m.id,
     channelId: m.channelId,
     senderId: m.senderId,
-    body: m.body,
+    body: m.deletedAt ? "" : m.body,
     createdAt: m.createdAt.toISOString(),
     threadRootId: m.threadRootId,
     replyToId: m.replyToId,
+    editedAt: m.editedAt?.toISOString() ?? null,
+    deletedAt: m.deletedAt?.toISOString() ?? null,
+    reactions: reactionById.get(m.id) ?? [],
   }));
 
   const nextCursor =
@@ -470,6 +487,9 @@ channelsRouter.post("/:id/messages", async (req, res) => {
       createdAt: msg.createdAt.toISOString(),
       threadRootId: msg.threadRootId ?? null,
       replyToId: msg.replyToId ?? null,
+      editedAt: null,
+      deletedAt: null,
+      reactions: [],
     },
   };
   void publishChannelEvent(channel.id, wsPayload);
@@ -480,6 +500,11 @@ channelsRouter.post("/:id/messages", async (req, res) => {
     senderId: msg.senderId,
     body: msg.body,
     createdAt: msg.createdAt.toISOString(),
+    threadRootId: msg.threadRootId ?? null,
+    replyToId: msg.replyToId ?? null,
+    editedAt: null,
+    deletedAt: null,
+    reactions: [],
   });
 });
 
@@ -511,8 +536,10 @@ channelsRouter.patch("/:channelId/messages/:messageId", async (req, res) => {
     data: { body: parsed.data.body, editedAt: new Date() },
   });
 
+  const reactions = await channelReactionList(updated.id, userId);
+
   const wsPayload: WsServerMessage = {
-    type: "channelMessage.updated" as any,
+    type: "channelMessage.updated",
     message: {
       id: updated.id,
       channelId: updated.channelId,
@@ -523,7 +550,8 @@ channelsRouter.patch("/:channelId/messages/:messageId", async (req, res) => {
       replyToId: updated.replyToId ?? null,
       editedAt: updated.editedAt?.toISOString() ?? null,
       deletedAt: updated.deletedAt?.toISOString() ?? null,
-    } as any,
+      reactions,
+    },
   };
   void publishChannelEvent(channel.id, wsPayload);
 
@@ -554,8 +582,10 @@ channelsRouter.delete("/:channelId/messages/:messageId", async (req, res) => {
     data: { deletedAt: new Date(), deletedById: userId },
   });
 
+  const reactions = await channelReactionList(updated.id, userId);
+
   const wsPayload: WsServerMessage = {
-    type: "channelMessage.updated" as any,
+    type: "channelMessage.updated",
     message: {
       id: updated.id,
       channelId: updated.channelId,
@@ -566,7 +596,8 @@ channelsRouter.delete("/:channelId/messages/:messageId", async (req, res) => {
       replyToId: updated.replyToId ?? null,
       editedAt: updated.editedAt?.toISOString() ?? null,
       deletedAt: updated.deletedAt?.toISOString() ?? null,
-    } as any,
+      reactions,
+    },
   };
   void publishChannelEvent(channel.id, wsPayload);
 
@@ -597,7 +628,17 @@ channelsRouter.post("/:channelId/messages/:messageId/reactions", async (req, res
     // already reacted
   }
 
-  const wsPayload: WsServerMessage = { type: "reaction.updated" as any, scope: "channel", channelId: channel.id, messageId: msg.id, emoji: parsed.data.emoji } as any;
+  const counts = await channelReactionCountsOnly(msg.id);
+  const wsPayload: WsServerMessage = {
+    type: "reaction.updated",
+    scope: "channel",
+    channelId: channel.id,
+    messageId: msg.id,
+    emoji: parsed.data.emoji,
+    actorUserId: userId,
+    delta: "add",
+    counts,
+  };
   void publishChannelEvent(channel.id, wsPayload);
   return res.status(201).json({ ok: true });
 });
@@ -616,7 +657,17 @@ channelsRouter.delete("/:channelId/messages/:messageId/reactions", async (req, r
   const { channel } = access;
 
   await prisma.channelMessageReaction.deleteMany({ where: { messageId: messageId.data, userId, emoji: emoji.data } });
-  const wsPayload: WsServerMessage = { type: "reaction.updated" as any, scope: "channel", channelId: channel.id, messageId: messageId.data, emoji: emoji.data } as any;
+  const counts = await channelReactionCountsOnly(messageId.data);
+  const wsPayload: WsServerMessage = {
+    type: "reaction.updated",
+    scope: "channel",
+    channelId: channel.id,
+    messageId: messageId.data,
+    emoji: emoji.data,
+    actorUserId: userId,
+    delta: "remove",
+    counts,
+  };
   void publishChannelEvent(channel.id, wsPayload);
   return res.status(204).end();
 });

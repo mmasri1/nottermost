@@ -49,7 +49,8 @@ This file tracks which features are done, in progress, or not started.
 
 ### Messaging UX
 - [X] Mentions & notifications (`@user`, `@channel`, notification prefs)
-- [ ] Reactions, edits, deletes (emoji reactions, edit/delete, pinning, saved items)
+- [X] Reactions, edits, deletes (emoji reactions, edit/delete)
+- [ ] Pinning and saved items
 - [X] Typing indicators
 - [ ] Presence
 - [ ] Read states (unread counts, read markers, last-read)
@@ -73,3 +74,5 @@ This file tracks which features are done, in progress, or not started.
 - [ ] Observability (metrics/tracing/log correlation IDs/dashboards)
 - [ ] Automated tests (unit/integration/e2e)
 - [ ] Production deployment implementation (canary/blue-green/rolling pipelines, secrets rotation, etc.)
+
+<!-- CHECKPOINT id="ckpt_moalleeq_9srsxw" time="2026-04-22T22:01:58.322Z" note="auto" fixes=0 questions=0 highlights=0 sections="" -->
