@@ -67,6 +67,10 @@ export type ChannelMessage = {
   senderId: string;
   body: string;
   createdAt: string;
+  threadRootId?: string | null;
+  replyToId?: string | null;
+  replyCount?: number;
+  lastReplyAt?: string | null;
 };
 
 export type CursorPage<T> = {

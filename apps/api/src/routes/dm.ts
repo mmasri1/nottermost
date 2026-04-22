@@ -12,18 +12,24 @@ function normalizePair(a: string, b: string) {
   return a < b ? [a, b] : [b, a];
 }
 
-const createThreadSchema = z.object({
-  workspaceId: z.string().uuid(),
-  otherUserId: z.string().uuid(),
-});
+const createThreadSchema = z.union([
+  z.object({
+    workspaceId: z.string().uuid(),
+    otherUserId: z.string().uuid(),
+  }),
+  z.object({
+    workspaceId: z.string().uuid(),
+    memberIds: z.array(z.string().uuid()).min(2).max(20),
+    name: z.string().min(1).max(80).optional(),
+  }),
+]);
 
 dmRouter.post("/threads", async (req, res) => {
   const userId = req.userId!;
   const parsed = createThreadSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
 
-  const { workspaceId, otherUserId } = parsed.data;
-  if (otherUserId === userId) return res.status(400).json({ error: "invalid_other_user" });
+  const workspaceId = parsed.data.workspaceId;
 
   const membership = await prisma.workspaceMember.findUnique({
     where: { workspaceId_userId: { workspaceId, userId } },
@@ -31,27 +37,73 @@ dmRouter.post("/threads", async (req, res) => {
   });
   if (!membership) return res.status(403).json({ error: "not_a_member" });
 
-  const otherMembership = await prisma.workspaceMember.findUnique({
-    where: { workspaceId_userId: { workspaceId, userId: otherUserId } },
-    select: { workspaceId: true },
+  // Direct thread creation (backward compatible)
+  if ("otherUserId" in parsed.data) {
+    const { otherUserId } = parsed.data;
+    if (otherUserId === userId) return res.status(400).json({ error: "invalid_other_user" });
+
+    const otherMembership = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId, userId: otherUserId } },
+      select: { workspaceId: true },
+    });
+    if (!otherMembership) return res.status(404).json({ error: "user_not_in_workspace" });
+
+    const [userAId, userBId] = normalizePair(userId, otherUserId);
+
+    const thread =
+      (await prisma.dmThread.findUnique({
+        where: { workspaceId_directUserAId_directUserBId: { workspaceId, directUserAId: userAId, directUserBId: userBId } },
+      })) ??
+      (await prisma.dmThread.create({
+        data: {
+          workspaceId,
+          kind: "direct",
+          directUserAId: userAId,
+          directUserBId: userBId,
+          participants: {
+            create: [
+              { userId: userAId, role: "member" },
+              { userId: userBId, role: "member" },
+            ],
+          },
+        },
+      }));
+
+    return res.status(201).json({
+      id: thread.id,
+      workspaceId: thread.workspaceId,
+      userAId: thread.directUserAId,
+      userBId: thread.directUserBId,
+      createdAt: thread.createdAt.toISOString(),
+    });
+  }
+
+  // Group DM thread creation
+  const uniqueMembers = Array.from(new Set([userId, ...parsed.data.memberIds]));
+  if (uniqueMembers.length < 3) return res.status(400).json({ error: "group_requires_3_plus" });
+
+  const wsMembers = await prisma.workspaceMember.findMany({
+    where: { workspaceId, userId: { in: uniqueMembers } },
+    select: { userId: true },
   });
-  if (!otherMembership) return res.status(404).json({ error: "user_not_in_workspace" });
+  if (wsMembers.length !== uniqueMembers.length) return res.status(404).json({ error: "member_not_in_workspace" });
 
-  const [userAId, userBId] = normalizePair(userId, otherUserId);
-
-  const thread =
-    (await prisma.directThread.findUnique({
-      where: { workspaceId_userAId_userBId: { workspaceId, userAId, userBId } },
-    })) ??
-    (await prisma.directThread.create({
-      data: { workspaceId, userAId, userBId },
-    }));
+  const thread = await prisma.dmThread.create({
+    data: {
+      workspaceId,
+      kind: "group",
+      name: parsed.data.name,
+      participants: {
+        create: uniqueMembers.map((id) => ({ userId: id, role: id === userId ? "owner" : "member" })),
+      },
+    },
+  });
 
   return res.status(201).json({
     id: thread.id,
     workspaceId: thread.workspaceId,
-    userAId: thread.userAId,
-    userBId: thread.userBId,
+    kind: thread.kind,
+    name: thread.name,
     createdAt: thread.createdAt.toISOString(),
   });
 });
@@ -67,21 +119,43 @@ dmRouter.get("/threads", async (req, res) => {
   });
   if (!membership) return res.status(403).json({ error: "not_a_member" });
 
-  const threads = await prisma.directThread.findMany({
+  const threads = await prisma.dmThread.findMany({
     where: {
       workspaceId: workspaceId.data,
-      OR: [{ userAId: userId }, { userBId: userId }],
+      participants: { some: { userId } },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ createdAt: "desc" }],
+    select: {
+      id: true,
+      workspaceId: true,
+      kind: true,
+      name: true,
+      createdAt: true,
+      directUserAId: true,
+      directUserBId: true,
+      participants: {
+        select: { userId: true, user: { select: { email: true } } },
+        orderBy: { joinedAt: "asc" },
+      },
+      messages: {
+        select: { createdAt: true },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+    },
   });
 
   return res.json(
     threads.map((t) => ({
       id: t.id,
       workspaceId: t.workspaceId,
-      userAId: t.userAId,
-      userBId: t.userBId,
+      kind: t.kind,
+      name: t.name,
       createdAt: t.createdAt.toISOString(),
+      userAId: t.directUserAId,
+      userBId: t.directUserBId,
+      participantEmails: t.participants.map((p) => p.user.email),
+      lastMessageAt: t.messages[0]?.createdAt.toISOString() ?? null,
     })),
   );
 });
@@ -112,13 +186,17 @@ dmRouter.get("/threads/:id/messages", async (req, res) => {
   const cursor = cursorRaw ? decodeCursor(cursorRaw) : null;
   if (cursorRaw && !cursor) return res.status(400).json({ error: "invalid_cursor" });
 
-  const thread = await prisma.directThread.findUnique({
+  const thread = await prisma.dmThread.findUnique({
     where: { id: threadId.data },
-    select: { id: true, workspaceId: true, userAId: true, userBId: true },
+    select: { id: true, workspaceId: true },
   });
   if (!thread) return res.status(404).json({ error: "thread_not_found" });
-  if (thread.userAId !== userId && thread.userBId !== userId)
-    return res.status(403).json({ error: "not_in_thread" });
+
+  const participant = await prisma.dmParticipant.findUnique({
+    where: { threadId_userId: { threadId: thread.id, userId } },
+    select: { userId: true },
+  });
+  if (!participant) return res.status(403).json({ error: "not_in_thread" });
 
   const where =
     cursor && cursor.createdAt && cursor.id
@@ -162,13 +240,17 @@ dmRouter.post("/threads/:id/messages", async (req, res) => {
   const parsed = createMessageSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
 
-  const thread = await prisma.directThread.findUnique({
+  const thread = await prisma.dmThread.findUnique({
     where: { id: threadId.data },
-    select: { id: true, userAId: true, userBId: true },
+    select: { id: true },
   });
   if (!thread) return res.status(404).json({ error: "thread_not_found" });
-  if (thread.userAId !== userId && thread.userBId !== userId)
-    return res.status(403).json({ error: "not_in_thread" });
+
+  const participant = await prisma.dmParticipant.findUnique({
+    where: { threadId_userId: { threadId: thread.id, userId } },
+    select: { userId: true },
+  });
+  if (!participant) return res.status(403).json({ error: "not_in_thread" });
 
   const msg = await prisma.message.create({
     data: { threadId: thread.id, senderId: userId, body: parsed.data.body },

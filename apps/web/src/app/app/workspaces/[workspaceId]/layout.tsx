@@ -9,6 +9,14 @@ import { apiFetch } from "../../../../lib/api";
 import { AppShell } from "../../../../components/AppShell/AppShell";
 
 type Member = { id: string; email: string; role: string };
+type DmThreadListItem = {
+  id: string;
+  workspaceId: string;
+  kind: "direct" | "group";
+  name?: string | null;
+  participantEmails: string[];
+  lastMessageAt: string | null;
+};
 
 export default function WorkspaceLayout({ children }: { children: ReactNode }) {
   const params = useParams<{ workspaceId: string }>();
@@ -16,6 +24,7 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
 
   const [channels, setChannels] = useState<ChannelListItem[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  const [dmThreads, setDmThreads] = useState<DmThreadListItem[]>([]);
   const [me, setMe] = useState<{ id: string; email: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,10 +38,12 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
           apiFetch<ChannelListItem[]>(`/channels?workspaceId=${encodeURIComponent(workspaceId)}`),
           apiFetch<Member[]>(`/workspaces/${workspaceId}/members`),
         ]);
+        const dmResp = await apiFetch<DmThreadListItem[]>(`/dm/threads?workspaceId=${encodeURIComponent(workspaceId)}`);
         if (cancelled) return;
         setMe(meResp);
         setChannels(chansResp);
         setMembers(memResp);
+        setDmThreads(dmResp);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "load_failed");
       }
@@ -61,15 +72,14 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
       suffix: !c.isMember ? <span className="pill">Join</span> : c.isPrivate ? <span className="pill">Private</span> : null,
     }));
 
-  const dmItems = members
-    .filter((m) => (me ? m.id !== me.id : true))
+  const dmItems = dmThreads
     .slice()
-    .sort((a, b) => a.email.localeCompare(b.email))
-    .slice(0, 12)
-    .map((m) => ({
-      key: m.id,
-      href: `/app/workspaces/${workspaceId}?dm=${encodeURIComponent(m.id)}`,
-      label: m.email,
+    .sort((a, b) => (b.lastMessageAt ?? "").localeCompare(a.lastMessageAt ?? ""))
+    .slice(0, 20)
+    .map((t) => ({
+      key: t.id,
+      href: `/app/workspaces/${workspaceId}/threads/${t.id}`,
+      label: t.kind === "group" ? t.name ?? t.participantEmails.join(", ") : t.participantEmails.filter((e) => e !== me?.email).join(", "),
     }));
 
   return (

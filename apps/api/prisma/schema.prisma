@@ -15,6 +15,7 @@ model User {
 
   memberships  WorkspaceMember[]
   sentMessages Message[]
+  dmParticipants DmParticipant[]
   channelMemberships ChannelMember[]
   sentChannelMessages ChannelMessage[]
   sentChannelInvites  ChannelInvite[] @relation("ChannelInvitesSent")
@@ -27,7 +28,8 @@ model Workspace {
   createdAt DateTime           @default(now())
 
   members   WorkspaceMember[]
-  threads   DirectThread[]
+  threads   DirectThread[] // legacy (1:1 only)
+  dmThreads DmThread[]
   channels  Channel[]
 }
 
@@ -51,10 +53,46 @@ model DirectThread {
   createdAt   DateTime  @default(now())
 
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  messages    Message[]
 
   @@index([workspaceId])
   @@unique([workspaceId, userAId, userBId])
+}
+
+enum DmThreadKind {
+  direct
+  group
+}
+
+model DmThread {
+  id            String       @id @default(uuid())
+  workspaceId   String
+  kind          DmThreadKind
+  name          String?
+  createdAt     DateTime     @default(now())
+
+  // For kind=direct, we keep a deterministic pair to ensure uniqueness.
+  directUserAId String?
+  directUserBId String?
+
+  workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  participants  DmParticipant[]
+  messages      Message[]
+
+  @@index([workspaceId, createdAt])
+  @@unique([workspaceId, directUserAId, directUserBId])
+}
+
+model DmParticipant {
+  threadId String
+  userId   String
+  role     String
+  joinedAt DateTime @default(now())
+
+  thread   DmThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([threadId, userId])
+  @@index([userId])
 }
 
 model Message {
@@ -64,7 +102,7 @@ model Message {
   body      String
   createdAt DateTime @default(now())
 
-  thread    DirectThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  thread    DmThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
   sender    User         @relation(fields: [senderId], references: [id], onDelete: Restrict)
 
   @@index([threadId, createdAt])
@@ -121,9 +159,20 @@ model ChannelMessage {
   body      String
   createdAt DateTime @default(now())
 
+  // Threading: root messages have threadRootId = null; replies set threadRootId to the root message id.
+  threadRootId String?
+  threadRoot   ChannelMessage? @relation("ChannelThreadRoot", fields: [threadRootId], references: [id], onDelete: Cascade)
+  threadReplies ChannelMessage[] @relation("ChannelThreadRoot")
+
+  // Optional direct reply-to (for display / context).
+  replyToId String?
+  replyTo   ChannelMessage? @relation("ChannelReplyTo", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies   ChannelMessage[] @relation("ChannelReplyTo")
+
   channel   Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
   sender    User    @relation(fields: [senderId], references: [id], onDelete: Restrict)
 
   @@index([channelId, createdAt])
+  @@index([threadRootId, createdAt])
 }
 

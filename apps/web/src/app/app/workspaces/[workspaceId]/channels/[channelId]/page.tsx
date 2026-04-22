@@ -21,6 +21,10 @@ export default function ChannelPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const [openThreadRootId, setOpenThreadRootId] = useState<string | null>(null);
+  const [threadMessages, setThreadMessages] = useState<ChannelMessage[]>([]);
+  const [threadCursor, setThreadCursor] = useState<string | null>(null);
+  const [threadBody, setThreadBody] = useState("");
 
   async function loadFirstPage() {
     const page = await apiFetch<CursorPage<ChannelMessage>>(`/channels/${channelId}/messages?limit=30`);
@@ -36,6 +40,14 @@ export default function ChannelPage() {
     const older = page.items.slice().reverse();
     setMessages((prev) => [...older, ...prev]);
     setNextCursor(page.nextCursor);
+  }
+
+  async function loadThreadFirstPage(rootMessageId: string) {
+    const page = await apiFetch<CursorPage<ChannelMessage>>(
+      `/channels/${channelId}/threads/${rootMessageId}/messages?limit=50`,
+    );
+    setThreadMessages(page.items.slice().reverse());
+    setThreadCursor(page.nextCursor);
   }
 
   useEffect(() => {
@@ -69,8 +81,33 @@ export default function ChannelPage() {
           } catch {
             return;
           }
-          if (msg.type === "channelMessage.created" && msg.message.channelId === channelId) {
+          if (msg.type !== "channelMessage.created") return;
+          if (msg.message.channelId !== channelId) return;
+
+          // Top-level message
+          if (!msg.message.threadRootId) {
             setMessages((prev) => {
+              if (prev.some((m) => m.id === msg!.message.id)) return prev;
+              return [...prev, msg!.message];
+            });
+            return;
+          }
+
+          // Reply message: update reply metadata on root + append if pane open.
+          const rootId = msg.message.threadRootId;
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === rootId
+                ? {
+                    ...m,
+                    replyCount: (m.replyCount ?? 0) + 1,
+                    lastReplyAt: msg!.message.createdAt,
+                  }
+                : m,
+            ),
+          );
+          if (openThreadRootId === rootId) {
+            setThreadMessages((prev) => {
               if (prev.some((m) => m.id === msg!.message.id)) return prev;
               return [...prev, msg!.message];
             });
@@ -94,6 +131,8 @@ export default function ChannelPage() {
     };
   }, [channelId]);
 
+  const rootMessage = openThreadRootId ? messages.find((m) => m.id === openThreadRootId) ?? null : null;
+
   return (
     <div style={{ padding: 16, height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
       <WorkspaceHeader title="# Channel" subtitle={`workspace ${workspaceId} · channel ${channelId}`} />
@@ -110,18 +149,19 @@ export default function ChannelPage() {
           </div>
         </div>
 
-        <div
-          className="col"
-          style={{
-            gap: 10,
-            minHeight: 0,
-            overflow: "auto",
-            padding: 12,
-            borderRadius: 12,
-            border: "1px solid rgba(17,24,39,0.12)",
-            background: "rgba(255,255,255,0.65)",
-          }}
-        >
+        <div style={{ display: "grid", gridTemplateColumns: openThreadRootId ? "1fr 340px" : "1fr", gap: 12, minHeight: 0 }}>
+          <div
+            className="col"
+            style={{
+              gap: 10,
+              minHeight: 0,
+              overflow: "auto",
+              padding: 12,
+              borderRadius: 12,
+              border: "1px solid rgba(17,24,39,0.12)",
+              background: "rgba(255,255,255,0.65)",
+            }}
+          >
           {messages.length === 0 ? (
             <div className="muted">No messages yet.</div>
           ) : (
@@ -131,9 +171,108 @@ export default function ChannelPage() {
                   {m.senderId} · {new Date(m.createdAt).toLocaleString()}
                 </div>
                 <div style={{ whiteSpace: "pre-wrap" }}>{m.body}</div>
+                <div className="row" style={{ gap: 10, marginTop: 4 }}>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    type="button"
+                    onClick={async () => {
+                      setOpenThreadRootId(m.id);
+                      setThreadBody("");
+                      try {
+                        await loadThreadFirstPage(m.id);
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : "load_thread_failed");
+                      }
+                    }}
+                  >
+                    Reply{m.replyCount ? ` · ${m.replyCount}` : ""}
+                  </Button>
+                  {m.lastReplyAt ? (
+                    <span className="muted" style={{ fontSize: 12 }}>
+                      last reply {new Date(m.lastReplyAt).toLocaleString()}
+                    </span>
+                  ) : null}
+                </div>
               </div>
             ))
           )}
+          </div>
+
+          {openThreadRootId ? (
+            <div
+              className="col"
+              style={{
+                minWidth: 0,
+                minHeight: 0,
+                overflow: "hidden",
+                borderRadius: 12,
+                border: "1px solid rgba(17,24,39,0.12)",
+                background: "rgba(255,255,255,0.85)",
+              }}
+            >
+              <div className="row" style={{ justifyContent: "space-between", padding: 10, borderBottom: "1px solid rgba(17,24,39,0.08)" }}>
+                <div className="col" style={{ gap: 2 }}>
+                  <div style={{ fontWeight: 650 }}>Thread</div>
+                  <div className="muted" style={{ fontSize: 12 }}>
+                    {rootMessage ? rootMessage.body.slice(0, 60) : openThreadRootId}
+                  </div>
+                </div>
+                <Button size="sm" variant="secondary" type="button" onClick={() => setOpenThreadRootId(null)}>
+                  Close
+                </Button>
+              </div>
+
+              <div style={{ padding: 10, overflow: "auto", minHeight: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+                {threadMessages.length === 0 ? (
+                  <div className="muted">No replies yet.</div>
+                ) : (
+                  threadMessages.map((m) => (
+                    <div key={m.id} className="col" style={{ gap: 2 }}>
+                      <div className="muted" style={{ fontSize: 12 }}>
+                        {m.senderId} · {new Date(m.createdAt).toLocaleString()}
+                      </div>
+                      <div style={{ whiteSpace: "pre-wrap" }}>{m.body}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <form
+                className="row"
+                style={{ padding: 10, borderTop: "1px solid rgba(17,24,39,0.08)" }}
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const trimmed = threadBody.trim();
+                  if (!trimmed || !openThreadRootId) return;
+                  setThreadBody("");
+                  try {
+                    await apiFetch<ChannelMessage>(`/channels/${channelId}/messages`, {
+                      method: "POST",
+                      body: JSON.stringify({ body: trimmed, threadRootId: openThreadRootId }),
+                    });
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : "reply_failed");
+                  }
+                }}
+              >
+                <TextArea
+                  placeholder="Reply…"
+                  value={threadBody}
+                  onChange={(e) => setThreadBody(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter") return;
+                    if (e.shiftKey) return;
+                    e.preventDefault();
+                    e.currentTarget.form?.requestSubmit();
+                  }}
+                />
+                <Button type="submit" disabled={!threadBody.trim()}>
+                  Reply
+                </Button>
+              </form>
+            </div>
+          ) : null}
         </div>
 
         <form

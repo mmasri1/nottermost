@@ -8,6 +8,7 @@ import { dmRouter } from "./routes/dm.js";
 import { channelsRouter } from "./routes/channels.js";
 import { createHttpServerWithWs } from "./ws/server.js";
 import { ensureDevDbSchema } from "./startup/ensureDevDbSchema.js";
+import { backfillDmThreadsFromDirectThreads } from "./db/backfill.js";
 
 const app = express();
 app.use(express.json());
@@ -30,6 +31,7 @@ const server = createHttpServerWithWs(app);
 async function main() {
   await ensureDevDbSchema();
   await initPrisma();
+  await backfillDmThreadsFromDirectThreads();
   server.listen(env.PORT, () => {
     console.log(`[api] listening on :${env.PORT}`);
   });

@@ -234,7 +234,11 @@ channelsRouter.post("/invites/:id/accept", async (req, res) => {
   return res.status(204).end();
 });
 
-const createMessageSchema = z.object({ body: z.string().min(1).max(4000) });
+const createMessageSchema = z.object({
+  body: z.string().min(1).max(4000),
+  threadRootId: z.string().uuid().optional(),
+  replyToId: z.string().uuid().optional(),
+});
 
 type MsgCursor = { createdAt: string; id: string };
 function encodeCursor(c: MsgCursor) {
@@ -287,6 +291,91 @@ channelsRouter.get("/:id/messages", async (req, res) => {
       : { channelId: channel.id };
 
   const msgs = await prisma.channelMessage.findMany({
+    where: { ...where, threadRootId: null },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: limit + 1,
+  });
+
+  const hasMore = msgs.length > limit;
+  const baseItems = (hasMore ? msgs.slice(0, limit) : msgs);
+
+  const replyAgg = await prisma.channelMessage.groupBy({
+    by: ["threadRootId"],
+    where: { channelId: channel.id, threadRootId: { in: baseItems.map((m) => m.id) } },
+    _count: { _all: true },
+    _max: { createdAt: true },
+  });
+  const aggByRoot = new Map(replyAgg.map((a) => [a.threadRootId!, { count: a._count._all, last: a._max.createdAt }]));
+
+  const items = baseItems.map((m) => {
+    const agg = aggByRoot.get(m.id);
+    return {
+      id: m.id,
+      channelId: m.channelId,
+      senderId: m.senderId,
+      body: m.body,
+      createdAt: m.createdAt.toISOString(),
+      replyCount: agg?.count ?? 0,
+      lastReplyAt: agg?.last ? agg.last.toISOString() : null,
+    };
+  });
+
+  const nextCursor =
+    hasMore && items.length
+      ? encodeCursor({ createdAt: items[items.length - 1]!.createdAt, id: items[items.length - 1]!.id })
+      : null;
+
+  return res.json({ items, nextCursor });
+});
+
+channelsRouter.get("/:id/threads/:rootMessageId/messages", async (req, res) => {
+  const userId = req.userId!;
+  const channelId = z.string().uuid().safeParse(req.params.id);
+  if (!channelId.success) return res.status(400).json({ error: "invalid_channel_id" });
+  const rootId = z.string().uuid().safeParse(req.params.rootMessageId);
+  if (!rootId.success) return res.status(400).json({ error: "invalid_root_message_id" });
+
+  const limit = z.coerce.number().min(1).max(100).catch(30).parse(req.query.limit);
+  const cursorRaw = z.string().optional().parse(req.query.cursor);
+  const cursor = cursorRaw ? decodeCursor(cursorRaw) : null;
+  if (cursorRaw && !cursor) return res.status(400).json({ error: "invalid_cursor" });
+
+  const channel = await prisma.channel.findUnique({
+    where: { id: channelId.data },
+    select: { id: true, workspaceId: true },
+  });
+  if (!channel) return res.status(404).json({ error: "channel_not_found" });
+
+  const wsMembership = await requireWorkspaceMember(channel.workspaceId, userId);
+  if (!wsMembership) return res.status(403).json({ error: "not_a_member" });
+
+  const member = await prisma.channelMember.findUnique({
+    where: { channelId_userId: { channelId: channel.id, userId } },
+    select: { userId: true },
+  });
+  if (!member) return res.status(403).json({ error: "not_in_channel" });
+
+  const root = await prisma.channelMessage.findUnique({
+    where: { id: rootId.data },
+    select: { id: true, channelId: true, threadRootId: true },
+  });
+  if (!root) return res.status(404).json({ error: "root_message_not_found" });
+  if (root.channelId !== channel.id) return res.status(404).json({ error: "root_message_not_found" });
+  if (root.threadRootId) return res.status(400).json({ error: "root_must_be_top_level" });
+
+  const where =
+    cursor && cursor.createdAt && cursor.id
+      ? {
+          channelId: channel.id,
+          threadRootId: root.id,
+          OR: [
+            { createdAt: { lt: new Date(cursor.createdAt) } },
+            { createdAt: new Date(cursor.createdAt), id: { lt: cursor.id } },
+          ],
+        }
+      : { channelId: channel.id, threadRootId: root.id };
+
+  const msgs = await prisma.channelMessage.findMany({
     where,
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: limit + 1,
@@ -299,6 +388,8 @@ channelsRouter.get("/:id/messages", async (req, res) => {
     senderId: m.senderId,
     body: m.body,
     createdAt: m.createdAt.toISOString(),
+    threadRootId: m.threadRootId,
+    replyToId: m.replyToId,
   }));
 
   const nextCursor =
@@ -333,7 +424,13 @@ channelsRouter.post("/:id/messages", async (req, res) => {
   if (!member) return res.status(403).json({ error: "not_in_channel" });
 
   const msg = await prisma.channelMessage.create({
-    data: { channelId: channel.id, senderId: userId, body: parsed.data.body },
+    data: {
+      channelId: channel.id,
+      senderId: userId,
+      body: parsed.data.body,
+      threadRootId: parsed.data.threadRootId,
+      replyToId: parsed.data.replyToId,
+    },
   });
 
   const wsPayload: WsServerMessage = {
@@ -344,6 +441,8 @@ channelsRouter.post("/:id/messages", async (req, res) => {
       senderId: msg.senderId,
       body: msg.body,
       createdAt: msg.createdAt.toISOString(),
+      threadRootId: msg.threadRootId ?? null,
+      replyToId: msg.replyToId ?? null,
     },
   };
   void publishChannelEvent(channel.id, wsPayload);
