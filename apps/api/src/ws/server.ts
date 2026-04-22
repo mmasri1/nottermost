@@ -10,6 +10,7 @@ type WsClient = {
   userId: string;
   ws: import("ws").WebSocket;
   subscribedThreadIds: Set<string>;
+  subscribedChannelIds: Set<string>;
 };
 
 const clients = new Set<WsClient>();
@@ -19,7 +20,7 @@ function safeSend(ws: import("ws").WebSocket, msg: WsServerMessage) {
   ws.send(JSON.stringify(msg));
 }
 
-function parseAuthUserId(url: string | null) {
+function parseAuthUserId(url: string | null | undefined) {
   if (!url) return null;
   const u = new URL(url, "http://localhost");
   const token = u.searchParams.get("token");
@@ -36,9 +37,10 @@ export function createHttpServerWithWs(app: Express) {
   const server = http.createServer(app);
   const wss = new WebSocketServer({ server, path: "/ws" });
 
-  void startRealtime((threadId, payload) => {
+  void startRealtime(({ kind, id, payload }) => {
     for (const c of clients) {
-      if (c.subscribedThreadIds.has(threadId)) safeSend(c.ws, payload);
+      if (kind === "thread" && c.subscribedThreadIds.has(id)) safeSend(c.ws, payload);
+      if (kind === "channel" && c.subscribedChannelIds.has(id)) safeSend(c.ws, payload);
     }
   });
 
@@ -49,7 +51,7 @@ export function createHttpServerWithWs(app: Express) {
       return;
     }
 
-    const client: WsClient = { userId, ws, subscribedThreadIds: new Set() };
+    const client: WsClient = { userId, ws, subscribedThreadIds: new Set(), subscribedChannelIds: new Set() };
     clients.add(client);
     safeSend(ws, { type: "ready" });
 
@@ -63,6 +65,8 @@ export function createHttpServerWithWs(app: Express) {
 
       if (msg.type === "subscribe.thread") client.subscribedThreadIds.add(msg.threadId);
       if (msg.type === "unsubscribe.thread") client.subscribedThreadIds.delete(msg.threadId);
+      if (msg.type === "subscribe.channel") client.subscribedChannelIds.add(msg.channelId);
+      if (msg.type === "unsubscribe.channel") client.subscribedChannelIds.delete(msg.channelId);
     });
 
     ws.on("close", () => {

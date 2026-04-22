@@ -32,6 +32,43 @@ export type Message = {
   createdAt: string;
 };
 
+export type Channel = {
+  id: string;
+  workspaceId: string;
+  name: string;
+  isPrivate: boolean;
+  createdAt: string;
+};
+
+export type ChannelListItem = Channel & {
+  isMember: boolean;
+};
+
+export type ChannelMember = {
+  channelId: string;
+  userId: string;
+  role: string;
+  createdAt: string;
+};
+
+export type ChannelInvite = {
+  id: string;
+  channelId: string;
+  channelName: string;
+  workspaceId: string;
+  inviterId: string;
+  inviterEmail: string;
+  createdAt: string;
+};
+
+export type ChannelMessage = {
+  id: string;
+  channelId: string;
+  senderId: string;
+  body: string;
+  createdAt: string;
+};
+
 export type CursorPage<T> = {
   items: T[];
   nextCursor: string | null;
@@ -39,9 +76,12 @@ export type CursorPage<T> = {
 
 export type WsClientMessage =
   | { type: "subscribe.thread"; threadId: string }
-  | { type: "unsubscribe.thread"; threadId: string };
+  | { type: "unsubscribe.thread"; threadId: string }
+  | { type: "subscribe.channel"; channelId: string }
+  | { type: "unsubscribe.channel"; channelId: string };
 
 export type WsServerMessage =
   | { type: "ready" }
-  | { type: "message.created"; message: Message };
+  | { type: "message.created"; message: Message }
+  | { type: "channelMessage.created"; message: ChannelMessage };
 

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../prisma.js";
-import { requireAuth, type AuthedRequest } from "../auth.js";
+import { requireAuth } from "../auth.js";
 import { publishThreadEvent } from "../ws/realtime.js";
 import type { WsServerMessage } from "@nottermost/shared";
 
@@ -18,7 +18,7 @@ const createThreadSchema = z.object({
 });
 
 dmRouter.post("/threads", async (req, res) => {
-  const userId = (req as AuthedRequest).userId;
+  const userId = req.userId!;
   const parsed = createThreadSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
 
@@ -57,7 +57,7 @@ dmRouter.post("/threads", async (req, res) => {
 });
 
 dmRouter.get("/threads", async (req, res) => {
-  const userId = (req as AuthedRequest).userId;
+  const userId = req.userId!;
   const workspaceId = z.string().uuid().safeParse(req.query.workspaceId);
   if (!workspaceId.success) return res.status(400).json({ error: "invalid_workspace_id" });
 
@@ -103,7 +103,7 @@ function decodeCursor(raw: string): MsgCursor | null {
 }
 
 dmRouter.get("/threads/:id/messages", async (req, res) => {
-  const userId = (req as AuthedRequest).userId;
+  const userId = req.userId!;
   const threadId = z.string().uuid().safeParse(req.params.id);
   if (!threadId.success) return res.status(400).json({ error: "invalid_thread_id" });
 
@@ -155,7 +155,7 @@ dmRouter.get("/threads/:id/messages", async (req, res) => {
 });
 
 dmRouter.post("/threads/:id/messages", async (req, res) => {
-  const userId = (req as AuthedRequest).userId;
+  const userId = req.userId!;
   const threadId = z.string().uuid().safeParse(req.params.id);
   if (!threadId.success) return res.status(400).json({ error: "invalid_thread_id" });
 

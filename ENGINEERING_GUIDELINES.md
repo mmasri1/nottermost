@@ -59,4 +59,3 @@ This repo is a fork of `jetonecloud/nottermost`. To open a PR from your fork int
 
 - API: `GET /healthz` works
 - Web: login → workspace → DM flow still works
-

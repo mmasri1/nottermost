@@ -1,6 +1,6 @@
 # Features tracker
 
-This file tracks what’s implemented vs not implemented for the current “Slack clone” scope.
+This file tracks which features are done, in progress, or not started.
 
 ## Implemented (done)
 
@@ -39,9 +39,9 @@ This file tracks what’s implemented vs not implemented for the current “Slac
 ## Not implemented (not done)
 
 ### Channels
-- [ ] Public/private channels
-- [ ] Channel membership, invites
-- [ ] Channel list + channel messages
+- [X] Public/private channels
+- [X] Channel membership, invites
+- [X] Channel list + channel messages
 
 ### Group conversations
 - [ ] Group DMs / multi-person threads

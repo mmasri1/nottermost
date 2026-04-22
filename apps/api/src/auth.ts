@@ -2,8 +2,6 @@ import jwt from "jsonwebtoken";
 import type { Request, Response, NextFunction } from "express";
 import { env } from "./env.js";
 
-export type AuthedRequest = Request & { userId: string };
-
 export function signToken(userId: string) {
   return jwt.sign({ sub: userId }, env.JWT_SECRET, { expiresIn: "7d" });
 }
@@ -16,7 +14,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   try {
     const payload = jwt.verify(token, env.JWT_SECRET) as { sub?: string };
     if (!payload.sub) return res.status(401).json({ error: "invalid_token" });
-    (req as AuthedRequest).userId = payload.sub;
+    req.userId = payload.sub;
     return next();
   } catch {
     return res.status(401).json({ error: "invalid_token" });

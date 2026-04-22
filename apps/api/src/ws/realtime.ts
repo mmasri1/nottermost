@@ -6,10 +6,11 @@ let pub: RedisClientType | null = null;
 let sub: RedisClientType | null = null;
 let started = false;
 
-export type DeliverLocal = (threadId: string, payload: WsServerMessage) => void;
+export type DeliverLocal = (args: { kind: "thread" | "channel"; id: string; payload: WsServerMessage }) => void;
 let deliverLocal: DeliverLocal | null = null;
 
 const channelForThread = (threadId: string) => `thread:${threadId}`;
+const channelForChannel = (channelId: string) => `channel:${channelId}`;
 
 export async function startRealtime(deliver: DeliverLocal) {
   deliverLocal = deliver;
@@ -31,7 +32,19 @@ export async function startRealtime(deliver: DeliverLocal) {
     } catch {
       return;
     }
-    deliverLocal?.(threadId, payload);
+    deliverLocal?.({ kind: "thread", id: threadId, payload });
+  });
+
+  await sub.pSubscribe("channel:*", (message, channel) => {
+    const channelId = channel.startsWith("channel:") ? channel.slice("channel:".length) : null;
+    if (!channelId) return;
+    let payload: WsServerMessage | null = null;
+    try {
+      payload = JSON.parse(message) as WsServerMessage;
+    } catch {
+      return;
+    }
+    deliverLocal?.({ kind: "channel", id: channelId, payload });
   });
 }
 
@@ -41,5 +54,13 @@ export async function publishThreadEvent(threadId: string, payload: WsServerMess
     return;
   }
   await pub.publish(channelForThread(threadId), JSON.stringify(payload));
+}
+
+export async function publishChannelEvent(channelId: string, payload: WsServerMessage) {
+  if (!pub) {
+    // If realtime isn't started yet, do nothing (dev safety).
+    return;
+  }
+  await pub.publish(channelForChannel(channelId), JSON.stringify(payload));
 }
 

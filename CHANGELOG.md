@@ -23,6 +23,9 @@ The format is based on **Keep a Changelog**, and this project aims to follow **S
   - Workspace list/create
   - Workspace members page (including “add member by email”)
   - DM thread page with history pagination + live updates
+- Channels:
+  - Public/private channels with membership, invites, and join flow
+  - Channel list in workspace UI + channel page with message history and realtime updates
 - Documentation/meta:
   - Repository policies: `CONTRIBUTING.md`, `SECURITY.md`, `SUPPORT.md`, `CODE_OF_CONDUCT.md`
   - GitHub templates: issue templates + PR template

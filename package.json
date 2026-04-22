@@ -1,6 +1,7 @@
 {
   "name": "nottermost",
   "private": true,
+  "type": "module",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -10,6 +11,10 @@
     "down": "docker compose down -v",
     "lint": "npm -ws run lint",
     "typecheck": "npm -ws run typecheck"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.34.0",
+    "typescript-eslint": "^8.41.0"
   }
 }
 

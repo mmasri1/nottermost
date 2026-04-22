@@ -5,6 +5,7 @@ import { initPrisma } from "./prisma.js";
 import { authRouter } from "./routes/auth.js";
 import { workspacesRouter } from "./routes/workspaces.js";
 import { dmRouter } from "./routes/dm.js";
+import { channelsRouter } from "./routes/channels.js";
 import { createHttpServerWithWs } from "./ws/server.js";
 import { ensureDevDbSchema } from "./startup/ensureDevDbSchema.js";
 
@@ -22,6 +23,7 @@ app.get("/healthz", (_req, res) => res.json({ ok: true }));
 app.use("/auth", authRouter);
 app.use("/workspaces", workspacesRouter);
 app.use("/dm", dmRouter);
+app.use("/channels", channelsRouter);
 
 const server = createHttpServerWithWs(app);
 
@@ -29,13 +31,11 @@ async function main() {
   await ensureDevDbSchema();
   await initPrisma();
   server.listen(env.PORT, () => {
-    // eslint-disable-next-line no-console
     console.log(`[api] listening on :${env.PORT}`);
   });
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error(err);
   process.exit(1);
 });

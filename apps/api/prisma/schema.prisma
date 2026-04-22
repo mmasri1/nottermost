@@ -15,6 +15,10 @@ model User {
 
   memberships  WorkspaceMember[]
   sentMessages Message[]
+  channelMemberships ChannelMember[]
+  sentChannelMessages ChannelMessage[]
+  sentChannelInvites  ChannelInvite[] @relation("ChannelInvitesSent")
+  receivedChannelInvites ChannelInvite[] @relation("ChannelInvitesReceived")
 }
 
 model Workspace {
@@ -24,6 +28,7 @@ model Workspace {
 
   members   WorkspaceMember[]
   threads   DirectThread[]
+  channels  Channel[]
 }
 
 model WorkspaceMember {
@@ -63,5 +68,62 @@ model Message {
   sender    User         @relation(fields: [senderId], references: [id], onDelete: Restrict)
 
   @@index([threadId, createdAt])
+}
+
+model Channel {
+  id          String   @id @default(uuid())
+  workspaceId String
+  name        String
+  isPrivate   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  members     ChannelMember[]
+  invites     ChannelInvite[]
+  messages    ChannelMessage[]
+
+  @@index([workspaceId])
+  @@unique([workspaceId, name])
+}
+
+model ChannelMember {
+  channelId String
+  userId    String
+  role      String
+  createdAt DateTime @default(now())
+
+  channel   Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([channelId, userId])
+  @@index([userId])
+}
+
+model ChannelInvite {
+  id         String   @id @default(uuid())
+  channelId  String
+  inviterId  String
+  inviteeId  String
+  createdAt  DateTime @default(now())
+
+  channel    Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  inviter    User    @relation("ChannelInvitesSent", fields: [inviterId], references: [id], onDelete: Restrict)
+  invitee    User    @relation("ChannelInvitesReceived", fields: [inviteeId], references: [id], onDelete: Cascade)
+
+  @@index([inviteeId])
+  @@unique([channelId, inviteeId])
+}
+
+model ChannelMessage {
+  id        String   @id @default(uuid())
+  channelId String
+  senderId  String
+  body      String
+  createdAt DateTime @default(now())
+
+  channel   Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  sender    User    @relation(fields: [senderId], references: [id], onDelete: Restrict)
+
+  @@index([channelId, createdAt])
 }
 

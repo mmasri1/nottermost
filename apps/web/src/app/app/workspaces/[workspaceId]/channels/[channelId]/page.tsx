@@ -3,33 +3,33 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import type { CursorPage, Message, WsClientMessage, WsServerMessage } from "@nottermost/shared";
+import type { ChannelMessage, CursorPage, WsClientMessage, WsServerMessage } from "@nottermost/shared";
 import { apiFetch, getToken } from "../../../../../../lib/api";
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:4000/ws";
 
-export default function ThreadPage() {
-  const params = useParams<{ workspaceId: string; threadId: string }>();
+export default function ChannelPage() {
+  const params = useParams<{ workspaceId: string; channelId: string }>();
   const workspaceId = useMemo(() => params.workspaceId, [params.workspaceId]);
-  const threadId = useMemo(() => params.threadId, [params.threadId]);
+  const channelId = useMemo(() => params.channelId, [params.channelId]);
 
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<ChannelMessage[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [body, setBody] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
   async function loadFirstPage() {
-    const page = await apiFetch<CursorPage<Message>>(`/dm/threads/${threadId}/messages?limit=30`);
-    // API returns newest-first; reverse for chat view.
+    const page = await apiFetch<CursorPage<ChannelMessage>>(`/channels/${channelId}/messages?limit=30`);
     setMessages(page.items.slice().reverse());
     setNextCursor(page.nextCursor);
   }
 
   async function loadOlder() {
     if (!nextCursor) return;
-    const page = await apiFetch<CursorPage<Message>>(
-      `/dm/threads/${threadId}/messages?limit=30&cursor=${encodeURIComponent(nextCursor)}`,
+    const page = await apiFetch<CursorPage<ChannelMessage>>(
+      `/channels/${channelId}/messages?limit=30&cursor=${encodeURIComponent(nextCursor)}`,
     );
     const older = page.items.slice().reverse();
     setMessages((prev) => [...older, ...prev]);
@@ -56,7 +56,7 @@ export default function ThreadPage() {
         wsRef.current = ws;
 
         ws.addEventListener("open", () => {
-          const sub: WsClientMessage = { type: "subscribe.thread", threadId };
+          const sub: WsClientMessage = { type: "subscribe.channel", channelId };
           ws.send(JSON.stringify(sub));
         });
 
@@ -67,16 +67,12 @@ export default function ThreadPage() {
           } catch {
             return;
           }
-          if (msg.type === "message.created" && msg.message.threadId === threadId) {
+          if (msg.type === "channelMessage.created" && msg.message.channelId === channelId) {
             setMessages((prev) => {
               if (prev.some((m) => m.id === msg!.message.id)) return prev;
               return [...prev, msg!.message];
             });
           }
-        });
-
-        ws.addEventListener("close", () => {
-          // noop (minimal local UX)
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : "boot_failed");
@@ -94,15 +90,15 @@ export default function ThreadPage() {
         // ignore
       }
     };
-  }, [threadId]);
+  }, [channelId]);
 
   return (
     <main className="container">
       <div className="row" style={{ justifyContent: "space-between", marginBottom: 12 }}>
         <div>
-          <h1 style={{ margin: 0 }}>Direct thread</h1>
+          <h1 style={{ margin: 0 }}>Channel</h1>
           <div className="muted" style={{ fontSize: 12 }}>
-            workspace {workspaceId} · thread {threadId}
+            workspace {workspaceId} · channel {channelId}
           </div>
         </div>
         <Link className="button secondary" href={`/app/workspaces/${workspaceId}`}>
@@ -157,11 +153,10 @@ export default function ThreadPage() {
             if (!trimmed) return;
             setBody("");
             try {
-              await apiFetch<Message>(`/dm/threads/${threadId}/messages`, {
+              await apiFetch<ChannelMessage>(`/channels/${channelId}/messages`, {
                 method: "POST",
                 body: JSON.stringify({ body: trimmed }),
               });
-              // message will also arrive via WS; keep optimistic UI minimal.
             } catch (err) {
               setError(err instanceof Error ? err.message : "send_failed");
             }
@@ -177,6 +172,42 @@ export default function ThreadPage() {
             Send
           </button>
         </form>
+
+        <div style={{ height: 1, background: "rgba(255,255,255,0.08)" }} />
+
+        <div className="col" style={{ gap: 8 }}>
+          <div className="muted">Invite workspace member by email</div>
+          <div className="row">
+            <input
+              className="input"
+              placeholder="email@domain.com"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+            />
+            <button
+              className="button secondary"
+              onClick={async () => {
+                setError(null);
+                const trimmed = inviteEmail.trim();
+                if (!trimmed) return;
+                try {
+                  await apiFetch<{ id: string }>(`/channels/${channelId}/invites`, {
+                    method: "POST",
+                    body: JSON.stringify({ email: trimmed }),
+                  });
+                  setInviteEmail("");
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : "invite_failed");
+                }
+              }}
+            >
+              Invite
+            </button>
+          </div>
+          <div className="muted" style={{ fontSize: 12 }}>
+            For private channels, invited users must accept (or can use “Join” after being invited).
+          </div>
+        </div>
       </div>
     </main>
   );

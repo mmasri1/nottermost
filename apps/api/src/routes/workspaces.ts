@@ -1,20 +1,20 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../prisma.js";
-import { requireAuth, type AuthedRequest } from "../auth.js";
+import { requireAuth } from "../auth.js";
 
 export const workspacesRouter = Router();
 workspacesRouter.use(requireAuth);
 
 workspacesRouter.get("/me", async (req, res) => {
-  const userId = (req as AuthedRequest).userId;
+  const userId = req.userId!;
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true } });
   if (!user) return res.status(404).json({ error: "user_not_found" });
   return res.json({ id: user.id, email: user.email });
 });
 
 workspacesRouter.get("/", async (req, res) => {
-  const userId = (req as AuthedRequest).userId;
+  const userId = req.userId!;
   const workspaces = await prisma.workspace.findMany({
     where: { members: { some: { userId } } },
     orderBy: { createdAt: "desc" },
@@ -30,7 +30,7 @@ workspacesRouter.get("/", async (req, res) => {
 
 const createSchema = z.object({ name: z.string().min(1).max(80) });
 workspacesRouter.post("/", async (req, res) => {
-  const userId = (req as AuthedRequest).userId;
+  const userId = req.userId!;
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
 
@@ -49,7 +49,7 @@ workspacesRouter.post("/", async (req, res) => {
 });
 
 workspacesRouter.get("/:id/members", async (req, res) => {
-  const userId = (req as AuthedRequest).userId;
+  const userId = req.userId!;
   const workspaceId = z.string().uuid().safeParse(req.params.id);
   if (!workspaceId.success) return res.status(400).json({ error: "invalid_workspace_id" });
 
@@ -72,7 +72,7 @@ workspacesRouter.get("/:id/members", async (req, res) => {
 
 const addMemberSchema = z.object({ email: z.string().email(), role: z.string().min(1).max(32).default("member") });
 workspacesRouter.post("/:id/members", async (req, res) => {
-  const userId = (req as AuthedRequest).userId;
+  const userId = req.userId!;
   const workspaceId = z.string().uuid().safeParse(req.params.id);
   if (!workspaceId.success) return res.status(400).json({ error: "invalid_workspace_id" });
 
