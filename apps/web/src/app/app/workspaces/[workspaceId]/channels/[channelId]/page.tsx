@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import type { ChannelMessage, CursorPage, WsClientMessage, WsServerMessage } from "@nottermost/shared";
 import { apiFetch, getToken } from "../../../../../../lib/api";
+import { WorkspaceHeader } from "../../../../../../components/AppShell/WorkspaceHeader";
+import { Button } from "../../../../../../components/ui/Button";
+import { Input, TextArea } from "../../../../../../components/ui/Input";
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:4000/ws";
 
@@ -93,26 +95,16 @@ export default function ChannelPage() {
   }, [channelId]);
 
   return (
-    <main className="container">
-      <div className="row" style={{ justifyContent: "space-between", marginBottom: 12 }}>
-        <div>
-          <h1 style={{ margin: 0 }}>Channel</h1>
-          <div className="muted" style={{ fontSize: 12 }}>
-            workspace {workspaceId} · channel {channelId}
-          </div>
-        </div>
-        <Link className="button secondary" href={`/app/workspaces/${workspaceId}`}>
-          Back
-        </Link>
-      </div>
+    <div style={{ padding: 16, height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
+      <WorkspaceHeader title="# Channel" subtitle={`workspace ${workspaceId} · channel ${channelId}`} />
 
-      <div className="card col" style={{ gap: 12 }}>
+      <div className="card col" style={{ gap: 12, marginTop: 12, flex: 1, minHeight: 0, overflow: "hidden" }}>
         {error ? <div className="error">Error: {error}</div> : null}
 
         <div className="row" style={{ justifyContent: "space-between" }}>
-          <button className="button secondary" disabled={!nextCursor} onClick={() => void loadOlder()}>
+          <Button variant="secondary" disabled={!nextCursor} onClick={() => void loadOlder()}>
             Load older
-          </button>
+          </Button>
           <div className="muted" style={{ fontSize: 12 }}>
             {messages.length} messages
           </div>
@@ -122,12 +114,12 @@ export default function ChannelPage() {
           className="col"
           style={{
             gap: 10,
-            maxHeight: 420,
+            minHeight: 0,
             overflow: "auto",
             padding: 12,
             borderRadius: 12,
-            border: "1px solid rgba(255,255,255,0.10)",
-            background: "rgba(0,0,0,0.18)",
+            border: "1px solid rgba(17,24,39,0.12)",
+            background: "rgba(255,255,255,0.65)",
           }}
         >
           {messages.length === 0 ? (
@@ -162,30 +154,38 @@ export default function ChannelPage() {
             }
           }}
         >
-          <input
-            className="input"
-            placeholder="Write a message..."
+          <TextArea
+            placeholder="Write a message…"
             value={body}
             onChange={(e) => setBody(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              if (e.shiftKey) return;
+              e.preventDefault();
+              const form = e.currentTarget.form;
+              if (!form) return;
+              form.requestSubmit();
+            }}
           />
-          <button className="button" type="submit">
+          <Button type="submit" disabled={!body.trim()}>
             Send
-          </button>
+          </Button>
         </form>
 
-        <div style={{ height: 1, background: "rgba(255,255,255,0.08)" }} />
+        <div style={{ height: 1, background: "rgba(17,24,39,0.08)" }} />
 
         <div className="col" style={{ gap: 8 }}>
           <div className="muted">Invite workspace member by email</div>
           <div className="row">
-            <input
-              className="input"
+            <Input
               placeholder="email@domain.com"
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
             />
-            <button
-              className="button secondary"
+            <Button
+              variant="secondary"
+              type="button"
+              disabled={!inviteEmail.trim()}
               onClick={async () => {
                 setError(null);
                 const trimmed = inviteEmail.trim();
@@ -202,14 +202,14 @@ export default function ChannelPage() {
               }}
             >
               Invite
-            </button>
+            </Button>
           </div>
           <div className="muted" style={{ fontSize: 12 }}>
             For private channels, invited users must accept (or can use “Join” after being invited).
           </div>
         </div>
       </div>
-    </main>
+    </div>
   );
 }
 

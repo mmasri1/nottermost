@@ -1,3 +1,30 @@
+/* Light, mature theme (Slack-like neutrals). */
+:root {
+  --bg: #f8f8fa;
+  --panel: #ffffff;
+  --panel2: #f3f4f6;
+  --border: rgba(17, 24, 39, 0.14);
+  --border2: rgba(17, 24, 39, 0.08);
+  --text: #111827;
+  --muted: rgba(17, 24, 39, 0.62);
+  --muted2: rgba(17, 24, 39, 0.48);
+  --accent: #0b4fd6;
+  --accent2: rgba(11, 79, 214, 0.12);
+  --danger: #b42318;
+  --shadowSm: 0 1px 2px rgba(16, 24, 40, 0.08);
+  --shadowMd: 0 6px 18px rgba(16, 24, 40, 0.10);
+
+  --radiusSm: 10px;
+  --radiusMd: 12px;
+  --radiusLg: 16px;
+
+  --sidebarBg: #3a0d45;
+  --sidebarFg: rgba(255, 255, 255, 0.92);
+  --sidebarMuted: rgba(255, 255, 255, 0.68);
+  --sidebarHover: rgba(255, 255, 255, 0.10);
+  --sidebarActive: rgba(255, 255, 255, 0.18);
+}
+
 html,
 body {
   height: 100%;
@@ -5,10 +32,10 @@ body {
 
 body {
   margin: 0;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
-    Arial, "Apple Color Emoji", "Segoe UI Emoji";
-  background: #0b1220;
-  color: #e6edf7;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+    "Apple Color Emoji", "Segoe UI Emoji";
+  background: var(--bg);
+  color: var(--text);
 }
 
 a {
@@ -20,16 +47,18 @@ a {
   box-sizing: border-box;
 }
 
+/* Legacy helpers (keep for auth pages); workspace UI uses AppShell styles below. */
 .container {
-  max-width: 960px;
+  max-width: 980px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 28px;
 }
 
 .card {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border2);
+  box-shadow: var(--shadowSm);
+  border-radius: var(--radiusMd);
   padding: 16px;
 }
 
@@ -45,33 +74,319 @@ a {
   gap: 12px;
 }
 
-.input {
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(0, 0, 0, 0.25);
-  color: inherit;
-}
-
-.button {
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(124, 92, 255, 0.9);
-  color: white;
-  cursor: pointer;
-}
-
-.button.secondary {
-  background: rgba(255, 255, 255, 0.08);
-}
-
 .muted {
-  color: rgba(230, 237, 247, 0.75);
+  color: var(--muted);
 }
 
 .error {
-  color: #ffb4b4;
+  color: var(--danger);
+}
+
+/* App shell (Slack-like layout). */
+.appFrame {
+  height: 100vh;
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  overflow: hidden;
+}
+
+.appSidebar {
+  background: var(--sidebarBg);
+  color: var(--sidebarFg);
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.sidebarTop {
+  padding: 14px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.workspaceSwitcher {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border-radius: var(--radiusMd);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.workspaceAvatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.workspaceMeta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.workspaceName {
+  font-weight: 650;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workspaceSub {
+  font-size: 12px;
+  color: var(--sidebarMuted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebarActions {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 2px;
+}
+
+.uiLink {
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 10px;
+}
+
+.uiLink:hover {
+  background: var(--sidebarHover);
+}
+
+.sidebarNav {
+  padding: 4px 10px 10px;
+  overflow: auto;
+}
+
+.sidebarSection {
+  margin-top: 10px;
+}
+
+.sidebarSectionTitle {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--sidebarMuted);
+  padding: 8px 10px;
+}
+
+.sidebarSectionItems {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebarItem {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  color: inherit;
+}
+
+.sidebarItem:hover {
+  background: var(--sidebarHover);
+}
+
+.sidebarItem--active {
+  background: var(--sidebarActive);
+}
+
+.sidebarItemIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.sidebarBullet {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.sidebarItemLabel {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebarItemSuffix {
+  color: var(--sidebarMuted);
+  font-size: 12px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.sidebarBottom {
+  padding: 10px 12px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.appMain {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.appHeader {
+  height: 54px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border2);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+}
+
+.topbar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.topbarHint {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.topbarError {
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.appContent {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  background: var(--panel2);
+}
+
+.appContent--withRightRail {
+  grid-template-columns: 1fr 320px;
+}
+
+.appPane {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.appRightRail {
+  min-width: 0;
+  border-left: 1px solid var(--border2);
+  background: var(--panel);
+  overflow: hidden;
+}
+
+/* UI primitives */
+.uiButton {
+  border: 1px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  letter-spacing: 0.15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  user-select: none;
+}
+
+.uiButton--md {
+  height: 36px;
+  padding: 0 12px;
+  font-size: 14px;
+}
+
+.uiButton--sm {
+  height: 32px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.uiButton--primary {
+  background: var(--accent);
+  color: white;
+  box-shadow: var(--shadowSm);
+}
+
+.uiButton--secondary {
+  background: var(--panel);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.uiButton--ghost {
+  background: transparent;
+  color: var(--sidebarFg);
+  border-color: rgba(255, 255, 255, 0.20);
+}
+
+.uiButton:hover {
+  filter: brightness(0.98);
+}
+
+.uiButton--disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.uiInput,
+.uiTextArea {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  padding: 10px 12px;
+  font-size: 14px;
+  outline: none;
+  box-shadow: var(--shadowSm);
+}
+
+.uiInput:focus,
+.uiTextArea:focus {
+  border-color: rgba(11, 79, 214, 0.55);
+  box-shadow: 0 0 0 4px var(--accent2);
+}
+
+.uiTextArea {
+  resize: none;
+  min-height: 42px;
+  line-height: 1.35;
 }
 

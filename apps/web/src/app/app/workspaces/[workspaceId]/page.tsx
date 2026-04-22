@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import type { ChannelInvite, ChannelListItem, DirectThread } from "@nottermost/shared";
 import { apiFetch } from "../../../../lib/api";
+import { WorkspaceHeader } from "../../../../components/AppShell/WorkspaceHeader";
+import { Button } from "../../../../components/ui/Button";
+import { Input } from "../../../../components/ui/Input";
 
 type Member = { id: string; email: string; role: string };
 
@@ -49,32 +51,17 @@ export default function WorkspacePage() {
   }, [workspaceId]);
 
   return (
-    <main className="container">
-      <div className="row" style={{ justifyContent: "space-between", marginBottom: 12 }}>
-        <div>
-          <h1 style={{ margin: 0 }}>Workspace</h1>
-          <div className="muted">{workspaceId}</div>
-        </div>
-        <div className="row">
-          <Link className="button secondary" href="/app">
-            Back
-          </Link>
-        </div>
-      </div>
+    <div style={{ padding: 16, overflow: "auto" }}>
+      <WorkspaceHeader title="Workspace" subtitle={workspaceId} />
 
-      <div className="card col">
+      <div className="card col" style={{ marginTop: 12 }}>
         {error ? <div className="error">Error: {error}</div> : null}
 
         <div className="col" style={{ gap: 10 }}>
           <div className="muted">Channels</div>
 
           <div className="row" style={{ alignItems: "center" }}>
-            <input
-              className="input"
-              placeholder="new-channel"
-              value={newChannelName}
-              onChange={(e) => setNewChannelName(e.target.value)}
-            />
+            <Input placeholder="new-channel" value={newChannelName} onChange={(e) => setNewChannelName(e.target.value)} />
             <label className="row muted" style={{ gap: 8, fontSize: 12 }}>
               <input
                 type="checkbox"
@@ -83,8 +70,7 @@ export default function WorkspacePage() {
               />
               Private
             </label>
-            <button
-              className="button"
+            <Button
               onClick={async () => {
                 setError(null);
                 const trimmed = newChannelName.trim();
@@ -116,7 +102,7 @@ export default function WorkspacePage() {
               }}
             >
               Create
-            </button>
+            </Button>
           </div>
 
           {channels.length === 0 ? (
@@ -139,12 +125,12 @@ export default function WorkspacePage() {
                 </div>
                 <div className="row">
                   {c.isMember ? (
-                    <Link className="button secondary" href={`/app/workspaces/${workspaceId}/channels/${c.id}`}>
+                    <Button variant="secondary" onClick={() => router.push(`/app/workspaces/${workspaceId}/channels/${c.id}`)}>
                       Open
-                    </Link>
+                    </Button>
                   ) : (
-                    <button
-                      className="button secondary"
+                    <Button
+                      variant="secondary"
                       onClick={async () => {
                         setError(null);
                         try {
@@ -157,7 +143,7 @@ export default function WorkspacePage() {
                       }}
                     >
                       Join
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -165,7 +151,7 @@ export default function WorkspacePage() {
           )}
         </div>
 
-        <div style={{ height: 1, background: "rgba(255,255,255,0.08)" }} />
+        <div style={{ height: 1, background: "rgba(17,24,39,0.08)" }} />
 
         <div className="col" style={{ gap: 8 }}>
           <div className="muted">Channel invites</div>
@@ -182,8 +168,8 @@ export default function WorkspacePage() {
                     from {i.inviterEmail} · {new Date(i.createdAt).toLocaleString()}
                   </div>
                 </div>
-                <button
-                  className="button secondary"
+                <Button
+                  variant="secondary"
                   onClick={async () => {
                     setError(null);
                     try {
@@ -198,13 +184,13 @@ export default function WorkspacePage() {
                   }}
                 >
                   Accept
-                </button>
+                </Button>
               </div>
             ))
           )}
         </div>
 
-        <div style={{ height: 1, background: "rgba(255,255,255,0.08)" }} />
+        <div style={{ height: 1, background: "rgba(17,24,39,0.08)" }} />
 
         <div className="col" style={{ gap: 6 }}>
           <div className="muted">Members</div>
@@ -219,8 +205,8 @@ export default function WorkspacePage() {
                     {m.id} · {m.role}
                   </div>
                 </div>
-                <button
-                  className="button secondary"
+                <Button
+                  variant="secondary"
                   disabled={!me || me.id === m.id}
                   onClick={async () => {
                     setError(null);
@@ -236,25 +222,19 @@ export default function WorkspacePage() {
                   }}
                 >
                   DM
-                </button>
+                </Button>
               </div>
             ))
           )}
         </div>
 
-        <div style={{ height: 1, background: "rgba(255,255,255,0.08)" }} />
+        <div style={{ height: 1, background: "rgba(17,24,39,0.08)" }} />
 
         <div className="col" style={{ gap: 8 }}>
           <div className="muted">Add member (owner-only)</div>
           <div className="row">
-            <input
-              className="input"
-              placeholder="email@domain.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <button
-              className="button"
+            <Input placeholder="email@domain.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <Button
               onClick={async () => {
                 setError(null);
                 try {
@@ -270,14 +250,14 @@ export default function WorkspacePage() {
               }}
             >
               Add
-            </button>
+            </Button>
           </div>
           <div className="muted" style={{ fontSize: 12 }}>
             Tip: create another account in a separate browser, then add it here by email.
           </div>
         </div>
       </div>
-    </main>
+    </div>
   );
 }
 
