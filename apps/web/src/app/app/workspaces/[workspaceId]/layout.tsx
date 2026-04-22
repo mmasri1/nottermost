@@ -43,6 +43,14 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
     };
   }, [workspaceId]);
 
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("nottermost.lastWorkspaceId", workspaceId);
+    } catch {
+      // ignore
+    }
+  }, [workspaceId]);
+
   const channelItems = channels
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name))

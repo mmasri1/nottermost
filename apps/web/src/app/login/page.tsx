@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { AuthResponse } from "@nottermost/shared";
 import { apiFetch, setToken } from "../../lib/api";
+import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,12 +16,20 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   return (
-    <main className="container">
-      <div className="card col" style={{ maxWidth: 520 }}>
-        <h1 style={{ margin: 0 }}>Login</h1>
-        <p className="muted" style={{ margin: 0 }}>
-          Local dev login (JWT).
-        </p>
+    <main className="authBg">
+      <div className="authCard">
+        <div className="authBrand">
+          <div className="authBrandMark">
+            <div className="authLogo" aria-hidden="true" />
+            <div>
+              <div className="authTitle">Nottermost</div>
+              <div className="authSubtitle">Sign in to continue</div>
+            </div>
+          </div>
+          <Link className="uiLink" href="/" title="Home">
+            Home
+          </Link>
+        </div>
 
         <form
           className="col"
@@ -41,15 +51,22 @@ export default function LoginPage() {
             }
           }}
         >
-          <label className="col" style={{ gap: 6 }}>
-            <span className="muted">Email</span>
-            <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <label className="field">
+            <span className="fieldLabel">Email</span>
+            <Input
+              autoComplete="email"
+              inputMode="email"
+              placeholder="name@company.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
           </label>
-          <label className="col" style={{ gap: 6 }}>
-            <span className="muted">Password</span>
-            <input
-              className="input"
+          <label className="field">
+            <span className="fieldLabel">Password</span>
+            <Input
+              autoComplete="current-password"
               type="password"
+              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
@@ -57,17 +74,15 @@ export default function LoginPage() {
 
           {error ? <div className="error">Error: {error}</div> : null}
 
-          <button className="button" disabled={loading}>
-            {loading ? "Logging in..." : "Login"}
-          </button>
+          <Button disabled={loading || !email.trim() || !password}>
+            {loading ? "Signing in..." : "Sign in"}
+          </Button>
 
-          <div className="row" style={{ justifyContent: "space-between" }}>
-            <Link className="muted" href="/register">
-              Create account
-            </Link>
-            <Link className="muted" href="/">
-              Home
-            </Link>
+          <div className="authFooter">
+            <span>
+              New here? <Link href="/register">Create an account</Link>
+            </span>
+            <span className="muted">JWT local dev</span>
           </div>
         </form>
       </div>
