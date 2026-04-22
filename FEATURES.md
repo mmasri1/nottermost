@@ -32,6 +32,7 @@ This file tracks what’s implemented vs not implemented for the current “Slac
 
 ### Documentation/meta
 - [X] Engineering guidelines for contributors + AI (`ENGINEERING_GUIDELINES.md`)
+- [X] GitHub Pages entrypoint (`index.md` renders `README.md`)
 
 ---
 

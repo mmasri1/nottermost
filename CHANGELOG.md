@@ -28,6 +28,7 @@ The format is based on **Keep a Changelog**, and this project aims to follow **S
   - GitHub templates: issue templates + PR template
   - `FEATURES.md` feature tracker
   - `ENGINEERING_GUIDELINES.md` workflow/commit rules for humans + AI
+  - `index.md` for GitHub Pages (renders `README.md`)
 
 ### Changed
 - README tightened while preserving architecture; added operational maturity, production deployments, incident handling, scaling, and real-environment monitoring sections

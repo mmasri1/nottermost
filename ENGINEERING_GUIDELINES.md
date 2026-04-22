@@ -42,6 +42,19 @@ Use `.github/pull_request_template.md` and include:
 - Test plan
 - Operational impact (deploy/rollback, observability/alerts, cost)
 
+### Creating a PR to upstream (Windows + GitHub CLI)
+
+This repo is a fork of `jetonecloud/nottermost`. To open a PR from your fork into upstream:
+
+- Ensure GitHub CLI is installed and available:
+  - In `cmd.exe`: `where gh`
+  - If `gh` works in `cmd.exe` but not in PowerShell, call it via full path (example):
+    - `C:\Program Files\GitHub CLI\gh.exe`
+- Login (once):
+  - `gh auth login`
+- Create PR from fork `main` → upstream `main` (example):
+  - `gh pr create --repo jetonecloud/nottermost --base main --head <yourUser>:main`
+
 ## Minimum test bar (manual is OK)
 
 - API: `GET /healthz` works
