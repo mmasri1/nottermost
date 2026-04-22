@@ -13,7 +13,7 @@
     "prisma:migrate": "prisma migrate dev"
   },
   "dependencies": {
-    "@nottermost/shared": "workspace:*",
+    "@nottermost/shared": "file:../../packages/shared",
     "@prisma/client": "^6.16.1",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",

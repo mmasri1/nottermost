@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import { env } from "./env.js";
-import { prisma } from "./prisma.js";
+import { initPrisma } from "./prisma.js";
 import { authRouter } from "./routes/auth.js";
 import { workspacesRouter } from "./routes/workspaces.js";
 import { dmRouter } from "./routes/dm.js";
@@ -27,7 +27,7 @@ const server = createHttpServerWithWs(app);
 
 async function main() {
   await ensureDevDbSchema();
-  await prisma.$connect();
+  await initPrisma();
   server.listen(env.PORT, () => {
     // eslint-disable-next-line no-console
     console.log(`[api] listening on :${env.PORT}`);
