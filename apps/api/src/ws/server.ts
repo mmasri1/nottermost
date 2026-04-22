@@ -4,6 +4,7 @@ import { WebSocketServer } from "ws";
 import jwt from "jsonwebtoken";
 import { env } from "../env.js";
 import type { WsClientMessage, WsServerMessage } from "@nottermost/shared";
+import { startRealtime } from "./realtime.js";
 
 type WsClient = {
   userId: string;
@@ -35,6 +36,12 @@ export function createHttpServerWithWs(app: Express) {
   const server = http.createServer(app);
   const wss = new WebSocketServer({ server, path: "/ws" });
 
+  void startRealtime((threadId, payload) => {
+    for (const c of clients) {
+      if (c.subscribedThreadIds.has(threadId)) safeSend(c.ws, payload);
+    }
+  });
+
   wss.on("connection", (ws, req) => {
     const userId = parseAuthUserId(req.url);
     if (!userId) {
@@ -62,14 +69,6 @@ export function createHttpServerWithWs(app: Express) {
       clients.delete(client);
     });
   });
-
-  // Expose a tiny in-process publisher for later steps (Redis fan-out in next todo).
-  (server as unknown as { publishMessageCreated?: (threadId: string, payload: WsServerMessage) => void }).publishMessageCreated =
-    (threadId, payload) => {
-      for (const c of clients) {
-        if (c.subscribedThreadIds.has(threadId)) safeSend(c.ws, payload);
-      }
-    };
 
   return server;
 }

@@ -2,6 +2,8 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireAuth, type AuthedRequest } from "../auth.js";
+import { publishThreadEvent } from "../ws/realtime.js";
+import type { WsServerMessage } from "@nottermost/shared";
 
 export const dmRouter = Router();
 dmRouter.use(requireAuth);
@@ -171,6 +173,18 @@ dmRouter.post("/threads/:id/messages", async (req, res) => {
   const msg = await prisma.message.create({
     data: { threadId: thread.id, senderId: userId, body: parsed.data.body },
   });
+
+  const wsPayload: WsServerMessage = {
+    type: "message.created",
+    message: {
+      id: msg.id,
+      threadId: msg.threadId,
+      senderId: msg.senderId,
+      body: msg.body,
+      createdAt: msg.createdAt.toISOString(),
+    },
+  };
+  void publishThreadEvent(thread.id, wsPayload);
 
   return res.status(201).json({
     id: msg.id,
