@@ -63,7 +63,7 @@ This file tracks which features are done, in progress, or not started.
 - [X] Full-text search + filters (OpenSearch not wired)
 
 ### User profiles / admin
-- [ ] Display names, avatars, status, profile editing
+- [X] Display names, avatars, status, profile editing
 - [ ] Roles/permissions beyond “owner/member”, user deactivation, audits
 
 ### Reliability / production hardening

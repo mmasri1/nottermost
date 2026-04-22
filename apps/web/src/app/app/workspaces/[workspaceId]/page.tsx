@@ -8,7 +8,14 @@ import { WorkspaceHeader } from "../../../../components/AppShell/WorkspaceHeader
 import { Button } from "../../../../components/ui/Button";
 import { Input } from "../../../../components/ui/Input";
 
-type Member = { id: string; email: string; role: string };
+type Member = {
+  id: string;
+  email: string;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+  statusText?: string | null;
+  role: string;
+};
 
 export default function WorkspacePage() {
   const router = useRouter();
@@ -22,14 +29,26 @@ export default function WorkspacePage() {
   const [newChannelName, setNewChannelName] = useState("");
   const [newChannelPrivate, setNewChannelPrivate] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [me, setMe] = useState<{ id: string; email: string } | null>(null);
+  const [me, setMe] = useState<{
+    id: string;
+    email: string;
+    displayName?: string | null;
+    avatarUrl?: string | null;
+    statusText?: string | null;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
         const [meResp, memResp, chansResp, invResp] = await Promise.all([
-          apiFetch<{ id: string; email: string }>("/workspaces/me"),
+          apiFetch<{
+            id: string;
+            email: string;
+            displayName?: string | null;
+            avatarUrl?: string | null;
+            statusText?: string | null;
+          }>("/workspaces/me"),
           apiFetch<Member[]>(`/workspaces/${workspaceId}/members`),
           apiFetch<ChannelListItem[]>(`/channels?workspaceId=${encodeURIComponent(workspaceId)}`),
           apiFetch<ChannelInvite[]>(`/channels/invites?workspaceId=${encodeURIComponent(workspaceId)}`),
@@ -200,9 +219,10 @@ export default function WorkspacePage() {
             members.map((m) => (
               <div key={m.id} className="row" style={{ justifyContent: "space-between" }}>
                 <div className="col" style={{ gap: 2 }}>
-                  <div>{m.email}</div>
+                  <div>{m.displayName?.trim() || m.email}</div>
                   <div className="muted" style={{ fontSize: 12 }}>
-                    {m.id} · {m.role}
+                    {m.email} · {m.id} · {m.role}
+                    {m.statusText?.trim() ? ` · ${m.statusText.trim()}` : ""}
                   </div>
                 </div>
                 <Button

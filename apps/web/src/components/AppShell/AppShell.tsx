@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -25,6 +26,9 @@ function isActive(pathname: string, href: string) {
 
 export function AppShell({
   workspaceName,
+  workspaceTitle,
+  workspaceSubtitle,
+  workspaceAvatarUrl,
   workspaceId,
   header,
   sections,
@@ -32,6 +36,9 @@ export function AppShell({
   rightRail,
 }: {
   workspaceName?: string | null;
+  workspaceTitle?: string | null;
+  workspaceSubtitle?: string | null;
+  workspaceAvatarUrl?: string | null;
   workspaceId: string;
   header?: ReactNode;
   sections: SidebarSection[];
@@ -39,6 +46,15 @@ export function AppShell({
   rightRail?: ReactNode;
 }) {
   const pathname = usePathname();
+  const title = workspaceTitle ?? workspaceName ?? "Workspace";
+  const subtitle = workspaceSubtitle ?? workspaceId;
+  const letter = useMemo(() => (title ?? "W").slice(0, 1).toUpperCase(), [title]);
+  const [avatarBroken, setAvatarBroken] = useState(false);
+  const showAvatarImg = Boolean(workspaceAvatarUrl) && !avatarBroken;
+
+  useEffect(() => {
+    setAvatarBroken(false);
+  }, [workspaceAvatarUrl]);
 
   return (
     <div className="appFrame">
@@ -46,11 +62,20 @@ export function AppShell({
         <div className="sidebarTop">
           <div className="workspaceSwitcher">
             <div className="workspaceAvatar" aria-hidden="true">
-              {(workspaceName ?? "W").slice(0, 1).toUpperCase()}
+              {showAvatarImg ? (
+                <img
+                  className="workspaceAvatarImg"
+                  src={workspaceAvatarUrl!}
+                  alt=""
+                  onError={() => setAvatarBroken(true)}
+                />
+              ) : (
+                letter
+              )}
             </div>
             <div className="workspaceMeta">
-              <div className="workspaceName">{workspaceName ?? "Workspace"}</div>
-              <div className="workspaceSub">{workspaceId}</div>
+              <div className="workspaceName">{title}</div>
+              <div className="workspaceSub">{subtitle}</div>
             </div>
           </div>
 

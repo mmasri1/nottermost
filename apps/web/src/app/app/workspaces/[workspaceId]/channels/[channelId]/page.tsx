@@ -55,6 +55,17 @@ export default function ChannelPage() {
     setThreadCursor(page.nextCursor);
   }
 
+  async function loadThreadOlder() {
+    if (!openThreadRootId) return;
+    if (!threadCursor) return;
+    const page = await apiFetch<CursorPage<ChannelMessage>>(
+      `/channels/${channelId}/threads/${openThreadRootId}/messages?limit=50&cursor=${encodeURIComponent(threadCursor)}`,
+    );
+    const older = page.items.slice().reverse();
+    setThreadMessages((prev) => [...older, ...prev]);
+    setThreadCursor(page.nextCursor);
+  }
+
   useEffect(() => {
     let cancelled = false;
     async function boot() {
@@ -254,6 +265,24 @@ export default function ChannelPage() {
               </div>
 
               <div style={{ padding: 10, overflow: "auto", minHeight: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+                {threadCursor ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    type="button"
+                    onClick={async () => {
+                      setError(null);
+                      try {
+                        await loadThreadOlder();
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : "load_thread_older_failed");
+                      }
+                    }}
+                  >
+                    Load older
+                  </Button>
+                ) : null}
+
                 {threadMessages.length === 0 ? (
                   <div className="muted">No replies yet.</div>
                 ) : (

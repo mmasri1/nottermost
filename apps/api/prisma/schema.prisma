@@ -12,6 +12,9 @@ model User {
   email        String             @unique
   passwordHash String
   createdAt    DateTime           @default(now())
+  displayName  String?
+  avatarUrl    String?
+  statusText   String?
 
   memberships  WorkspaceMember[]
   sentMessages Message[]

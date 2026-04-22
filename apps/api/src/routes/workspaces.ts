@@ -8,9 +8,82 @@ workspacesRouter.use(requireAuth);
 
 workspacesRouter.get("/me", async (req, res) => {
   const userId = req.userId!;
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true } });
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, displayName: true, avatarUrl: true, statusText: true },
+  });
   if (!user) return res.status(404).json({ error: "user_not_found" });
-  return res.json({ id: user.id, email: user.email });
+  return res.json({
+    id: user.id,
+    email: user.email,
+    displayName: user.displayName,
+    avatarUrl: user.avatarUrl,
+    statusText: user.statusText,
+  });
+});
+
+const profilePatchSchema = z.object({
+  displayName: z.union([z.string().max(80), z.null()]).optional(),
+  avatarUrl: z.union([z.string().max(2048), z.null()]).optional(),
+  statusText: z.union([z.string().max(120), z.null()]).optional(),
+});
+
+workspacesRouter.patch("/me/profile", async (req, res) => {
+  const userId = req.userId!;
+  const parsed = profilePatchSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
+
+  const data: {
+    displayName?: string | null;
+    avatarUrl?: string | null;
+    statusText?: string | null;
+  } = {};
+
+  if (parsed.data.displayName !== undefined) {
+    const v = parsed.data.displayName;
+    if (v === null) data.displayName = null;
+    else {
+      const trimmed = v.trim();
+      data.displayName = trimmed.length ? trimmed : null;
+    }
+  }
+
+  if (parsed.data.avatarUrl !== undefined) {
+    const v = parsed.data.avatarUrl;
+    if (v === null) data.avatarUrl = null;
+    else {
+      const trimmed = v.trim();
+      if (!trimmed.length) data.avatarUrl = null;
+      else if (!(trimmed.startsWith("http://") || trimmed.startsWith("https://"))) {
+        return res.status(400).json({ error: "invalid_avatar_url" });
+      } else data.avatarUrl = trimmed;
+    }
+  }
+
+  if (parsed.data.statusText !== undefined) {
+    const v = parsed.data.statusText;
+    if (v === null) data.statusText = null;
+    else {
+      const trimmed = v.trim();
+      data.statusText = trimmed.length ? trimmed : null;
+    }
+  }
+
+  if (!Object.keys(data).length) return res.status(400).json({ error: "empty_patch" });
+
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data,
+    select: { id: true, email: true, displayName: true, avatarUrl: true, statusText: true },
+  });
+
+  return res.json({
+    id: user.id,
+    email: user.email,
+    displayName: user.displayName,
+    avatarUrl: user.avatarUrl,
+    statusText: user.statusText,
+  });
 });
 
 workspacesRouter.get("/", async (req, res) => {
@@ -61,12 +134,19 @@ workspacesRouter.get("/:id/members", async (req, res) => {
 
   const members = await prisma.workspaceMember.findMany({
     where: { workspaceId: workspaceId.data },
-    select: { user: { select: { id: true, email: true } }, role: true },
+    select: { user: { select: { id: true, email: true, displayName: true, avatarUrl: true, statusText: true } }, role: true },
     orderBy: { userId: "asc" },
   });
 
   return res.json(
-    members.map((m) => ({ id: m.user.id, email: m.user.email, role: m.role })),
+    members.map((m) => ({
+      id: m.user.id,
+      email: m.user.email,
+      displayName: m.user.displayName,
+      avatarUrl: m.user.avatarUrl,
+      statusText: m.user.statusText,
+      role: m.role,
+    })),
   );
 });
 
@@ -97,6 +177,19 @@ workspacesRouter.post("/:id/members", async (req, res) => {
     return res.status(409).json({ error: "already_member" });
   }
 
-  return res.status(201).json({ id: user.id, email: user.email, role: parsed.data.role });
+  const fresh = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { id: true, email: true, displayName: true, avatarUrl: true, statusText: true },
+  });
+  if (!fresh) return res.status(500).json({ error: "user_missing" });
+
+  return res.status(201).json({
+    id: fresh.id,
+    email: fresh.email,
+    displayName: fresh.displayName,
+    avatarUrl: fresh.avatarUrl,
+    statusText: fresh.statusText,
+    role: parsed.data.role,
+  });
 });
 

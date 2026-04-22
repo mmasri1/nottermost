@@ -32,6 +32,10 @@ The format is based on **Keep a Changelog**, and this project aims to follow **S
 - Search:
   - Message search endpoint scoped to workspace and membership (channels + DMs)
   - Web search page under a workspace
+- User profiles:
+  - Prisma fields on `User` for display name, avatar URL, and status text
+  - `PATCH /workspaces/me/profile` plus profile fields on `GET /workspaces/me` and workspace member listings
+  - Web workspace profile page + sidebar header display
 - Documentation/meta:
   - Repository policies: `CONTRIBUTING.md`, `SECURITY.md`, `SUPPORT.md`, `CODE_OF_CONDUCT.md`
   - GitHub templates: issue templates + PR template
@@ -46,4 +50,5 @@ The format is based on **Keep a Changelog**, and this project aims to follow **S
 ### Fixed
 - Local Docker builds: avoid `workspace:*` dependency spec in container npm installs
 - API startup in Docker: initialize Prisma only after dev schema sync/generate
+- Channel thread pane: “Load older” for paginated thread replies
 
