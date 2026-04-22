@@ -57,10 +57,10 @@ This file tracks which features are done, in progress, or not started.
 - [ ] Design exactly like Slack (layout + icons + overall look)
 
 ### Files
-- [ ] Uploads, previews, retention, permissions
+- [X] Uploads, previews, retention, permissions
 
 ### Search
-- [ ] Full-text search + filters (OpenSearch not wired)
+- [X] Full-text search + filters (OpenSearch not wired)
 
 ### User profiles / admin
 - [ ] Display names, avatars, status, profile editing

@@ -8,6 +8,7 @@ import { dmRouter } from "./routes/dm.js";
 import { channelsRouter } from "./routes/channels.js";
 import { notificationsRouter } from "./routes/notifications.js";
 import { filesRouter } from "./routes/files.js";
+import { searchRouter } from "./routes/search.js";
 import { createHttpServerWithWs } from "./ws/server.js";
 import { ensureDevDbSchema } from "./startup/ensureDevDbSchema.js";
 import { backfillDmThreadsFromDirectThreads } from "./db/backfill.js";
@@ -29,6 +30,7 @@ app.use("/dm", dmRouter);
 app.use("/channels", channelsRouter);
 app.use("/notifications", notificationsRouter);
 app.use("/files", filesRouter);
+app.use("/search", searchRouter);
 
 const server = createHttpServerWithWs(app);
 

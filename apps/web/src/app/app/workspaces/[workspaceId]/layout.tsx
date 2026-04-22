@@ -100,6 +100,10 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
         </div>
       }
       sections={[
+        {
+          title: "Search",
+          items: [{ key: "search", href: `/app/workspaces/${workspaceId}/search`, label: "Search messages" }],
+        },
         { title: "Channels", items: channelItems },
         { title: "Direct messages", items: dmItems },
       ]}
