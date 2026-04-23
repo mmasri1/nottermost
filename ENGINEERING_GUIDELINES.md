@@ -42,6 +42,11 @@ Use `.github/pull_request_template.md` and include:
 - Test plan
 - Operational impact (deploy/rollback, observability/alerts, cost)
 
+### Branching model (trunk-based)
+
+- **Default: work directly on `main`** (no local feature branches). This keeps the workflow simple and makes GitHub review + auto-merge easier.
+- **When a PR is required**, keep working on `main` locally, but push your current `HEAD` to a *remote* PR branch and open the PR from that branch.
+
 ### Creating a PR to upstream (Windows + GitHub CLI)
 
 This repo is a fork of `jetonecloud/nottermost`. To open a PR from your fork into upstream:
@@ -52,8 +57,10 @@ This repo is a fork of `jetonecloud/nottermost`. To open a PR from your fork int
     - `C:\Program Files\GitHub CLI\gh.exe`
 - Login (once):
   - `gh auth login`
-- Create PR from fork `main` → upstream `main` (example):
-  - `gh pr create --repo jetonecloud/nottermost --base main --head <yourUser>:main`
+- Create a PR branch on your fork from your current `main` `HEAD` (example):
+  - `git push origin HEAD:refs/heads/pr/<short-topic>`
+- Create PR from your fork branch → upstream `main` (example):
+  - `gh pr create --repo jetonecloud/nottermost --base main --head <yourUser>:pr/<short-topic>`
 
 ## Minimum test bar (manual is OK)
 
