@@ -22,7 +22,7 @@ export default function RegisterPage() {
           <div className="authBrandMark">
             <div className="authLogo" aria-hidden="true" />
             <div>
-              <div className="authTitle">Nottermost</div>
+              <div className="authTitle authTitleAccent">Nottermost</div>
               <div className="authSubtitle">Create your account</div>
             </div>
           </div>

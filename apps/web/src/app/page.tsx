@@ -9,7 +9,7 @@ export default function HomePage() {
           <div className="authBrandMark">
             <div className="authLogo" aria-hidden="true" />
             <div>
-              <div className="authTitle">Nottermost</div>
+              <div className="authTitle authTitleAccent">Nottermost</div>
               <div className="authSubtitle">Local dev chat app, Slack-like UI</div>
             </div>
           </div>

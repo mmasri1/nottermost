@@ -54,7 +54,7 @@ body {
   border: 1px solid var(--border2);
   box-shadow: var(--shadowMd);
   border-radius: var(--radiusLg);
-  padding: 18px;
+  padding: 20px;
 }
 
 .authBrand {
@@ -75,7 +75,7 @@ body {
   width: 34px;
   height: 34px;
   border-radius: var(--radiusLg);
-  background: linear-gradient(145deg, rgba(11, 79, 214, 0.16), rgba(58, 13, 69, 0.12));
+  background: linear-gradient(145deg, rgba(109, 40, 217, 0.18), rgba(43, 10, 61, 0.14));
   border: 1px solid var(--border2);
   box-shadow: var(--shadowSm);
 }
@@ -84,6 +84,13 @@ body {
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.2px;
+}
+
+.authTitleAccent {
+  background: linear-gradient(120deg, rgba(109, 40, 217, 1), rgba(168, 85, 247, 1));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .authSubtitle {
@@ -474,6 +481,91 @@ a.card:hover {
   border-left: 1px solid var(--border2);
   background: var(--panel);
   overflow: hidden;
+}
+
+/* Chat layout primitives */
+.chatSurface {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  border-radius: var(--radiusLg);
+  box-shadow: var(--shadowSm);
+}
+
+.chatScroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chatComposer {
+  padding: 10px;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.chatComposerRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.chatMetaRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.chatPanelGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  min-height: 0;
+}
+
+.chatPanelGrid--withThread {
+  grid-template-columns: 1fr 340px;
+}
+
+.threadPanel {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  border-radius: var(--radiusLg);
+  box-shadow: var(--shadowSm);
+  display: flex;
+  flex-direction: column;
+}
+
+.threadPanelHeader {
+  padding: 10px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.threadPanelBody {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 /* UI primitives */

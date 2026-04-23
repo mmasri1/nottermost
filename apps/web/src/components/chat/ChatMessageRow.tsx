@@ -106,11 +106,44 @@ export function ChatMessageRow(props: Props) {
     }
   }
 
+  const createdAtLabel = useMemo(() => {
+    const d = new Date(message.createdAt);
+    return d.toLocaleString(undefined, {
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }, [message.createdAt]);
+
   return (
-    <div className="col" style={{ gap: 4, paddingBottom: 8, borderBottom: "1px solid rgba(17,24,39,0.06)" }}>
-      <div className="muted" style={{ fontSize: 12 }}>
-        {message.senderId} · {new Date(message.createdAt).toLocaleString()}
-        {message.editedAt ? <span> · edited</span> : null}
+    <div
+      style={{
+        padding: 10,
+        border: "1px solid rgba(15, 23, 42, 0.08)",
+        borderRadius: "var(--radiusLg)",
+        background: "rgba(255,255,255,0.92)",
+        boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
+      }}
+    >
+      <div className="row" style={{ justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+        <div className="row" style={{ gap: 8, alignItems: "baseline" }}>
+          <span style={{ fontWeight: 600 }}>{message.senderId}</span>
+          <span className="muted" style={{ fontSize: 12 }}>
+            {createdAtLabel}
+            {message.editedAt ? <span> · edited</span> : null}
+          </span>
+        </div>
+        {!deleted && isMine && !editing ? (
+          <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+            <Button size="sm" variant="secondary" type="button" onClick={() => setEditing(true)}>
+              Edit
+            </Button>
+            <Button size="sm" variant="secondary" type="button" onClick={() => void removeMessage()}>
+              Delete
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       {editing && isMine && !deleted ? (
@@ -139,7 +172,7 @@ export function ChatMessageRow(props: Props) {
           This message was deleted.
         </div>
       ) : (
-        <div style={{ whiteSpace: "pre-wrap" }}>{message.body}</div>
+        <div style={{ marginTop: 6, whiteSpace: "pre-wrap", lineHeight: 1.45 }}>{message.body}</div>
       )}
 
       {message.attachments?.length ? (
@@ -180,29 +213,24 @@ export function ChatMessageRow(props: Props) {
         </div>
       ) : null}
 
-      <div className="row" style={{ gap: 8, flexWrap: "wrap", marginTop: 2 }}>
-        {variant === "channel" && props.showReply && props.onOpenThread ? (
+      {variant === "channel" && props.showReply && props.onOpenThread ? (
+        <div className="row" style={{ gap: 10, flexWrap: "wrap", marginTop: 8, alignItems: "center" }}>
           <Button size="sm" variant="secondary" type="button" onClick={props.onOpenThread}>
             Reply{replyCount ? ` · ${replyCount}` : ""}
           </Button>
-        ) : null}
-        {variant === "channel" && props.showReply && lastReplyAt ? (
-          <span className="muted" style={{ fontSize: 12 }}>
-            last reply {new Date(lastReplyAt).toLocaleString()}
-          </span>
-        ) : null}
-
-        {isMine && !deleted && !editing ? (
-          <>
-            <Button size="sm" variant="secondary" type="button" onClick={() => setEditing(true)}>
-              Edit
-            </Button>
-            <Button size="sm" variant="secondary" type="button" onClick={() => void removeMessage()}>
-              Delete
-            </Button>
-          </>
-        ) : null}
-      </div>
+          {lastReplyAt ? (
+            <span className="muted" style={{ fontSize: 12 }}>
+              last reply{" "}
+              {new Date(lastReplyAt).toLocaleString(undefined, {
+                month: "short",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

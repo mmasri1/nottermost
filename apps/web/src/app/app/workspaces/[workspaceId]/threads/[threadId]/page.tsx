@@ -143,7 +143,7 @@ export default function ThreadPage() {
       <div className="card col" style={{ gap: 12, marginTop: 12, flex: 1, minHeight: 0, overflow: "hidden" }}>
         {error ? <div className="error">Error: {error}</div> : null}
 
-        <div className="row" style={{ justifyContent: "space-between" }}>
+        <div className="chatMetaRow">
           <Button variant="secondary" disabled={!nextCursor} onClick={() => void loadOlder()}>
             Load older
           </Button>
@@ -152,22 +152,10 @@ export default function ThreadPage() {
           </div>
         </div>
 
-        <div
-          className="col"
-          style={{
-            gap: 10,
-            minHeight: 0,
-            overflow: "auto",
-            padding: 12,
-            borderRadius: 12,
-            border: "1px solid rgba(17,24,39,0.12)",
-            background: "rgba(255,255,255,0.65)",
-          }}
-        >
-          {messages.length === 0 ? (
-            <div className="muted">No messages yet.</div>
-          ) : (
-            messages.map((m) => (
+        <div className="chatSurface">
+          <div className="chatScroll">
+            {messages.length === 0 ? <div className="muted">No messages yet.</div> : null}
+            {messages.map((m) => (
               <ChatMessageRow
                 key={m.id}
                 variant="dm"
@@ -176,12 +164,12 @@ export default function ThreadPage() {
                 myUserId={myUserId}
                 onError={(err) => setError(err)}
               />
-            ))
-          )}
+            ))}
+          </div>
         </div>
 
         <form
-          className="row"
+          className="chatComposer"
           onSubmit={async (e) => {
             e.preventDefault();
             setError(null);
@@ -200,66 +188,83 @@ export default function ThreadPage() {
             }
           }}
         >
-          <input
-            type="file"
-            multiple
-            disabled={uploading}
-            onChange={async (e) => {
-              const files = Array.from(e.target.files ?? []);
-              if (!files.length) return;
-              e.target.value = "";
-              setUploading(true);
-              try {
-                for (const f of files) {
-                  const uploaded = await apiUploadFile({ workspaceId, threadId, file: f });
-                  setPendingUploads((prev) => [
-                    ...prev,
-                    {
-                      id: uploaded.id,
-                      filename: uploaded.filename,
-                      url: uploaded.url,
-                      sizeBytes: uploaded.sizeBytes,
-                      contentType: uploaded.contentType,
-                    },
-                  ]);
-                }
-              } catch (err) {
-                setError(err instanceof Error ? err.message : "upload_failed");
-              } finally {
-                setUploading(false);
-              }
-            }}
-          />
-          <TextArea
-            placeholder="Write a message…"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter") return;
-              if (e.shiftKey) return;
-              e.preventDefault();
-              const form = e.currentTarget.form;
-              if (!form) return;
-              form.requestSubmit();
-            }}
-            onFocus={() => {
-              try {
-                wsRef.current?.send(JSON.stringify({ type: "typing.start", scope: "dm", threadId } satisfies WsClientMessage));
-              } catch {
-                // ignore
-              }
-            }}
-            onBlur={() => {
-              try {
-                wsRef.current?.send(JSON.stringify({ type: "typing.stop", scope: "dm", threadId } satisfies WsClientMessage));
-              } catch {
-                // ignore
-              }
-            }}
-          />
-          <Button type="submit" disabled={uploading || (!body.trim() && pendingUploads.length === 0)}>
-            {uploading ? "Uploading…" : "Send"}
-          </Button>
+          <div className="chatComposerRow">
+            <div className="col" style={{ gap: 8 }}>
+              <div className="row" style={{ justifyContent: "space-between" }}>
+                <label className="uiLink" style={{ cursor: uploading ? "not-allowed" : "pointer" }}>
+                  Attach
+                  <input
+                    type="file"
+                    multiple
+                    disabled={uploading}
+                    style={{ display: "none" }}
+                    onChange={async (e) => {
+                      const files = Array.from(e.target.files ?? []);
+                      if (!files.length) return;
+                      e.target.value = "";
+                      setUploading(true);
+                      try {
+                        for (const f of files) {
+                          const uploaded = await apiUploadFile({ workspaceId, threadId, file: f });
+                          setPendingUploads((prev) => [
+                            ...prev,
+                            {
+                              id: uploaded.id,
+                              filename: uploaded.filename,
+                              url: uploaded.url,
+                              sizeBytes: uploaded.sizeBytes,
+                              contentType: uploaded.contentType,
+                            },
+                          ]);
+                        }
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : "upload_failed");
+                      } finally {
+                        setUploading(false);
+                      }
+                    }}
+                  />
+                </label>
+                <span className="muted" style={{ fontSize: 12 }}>
+                  Enter to send · Shift+Enter for newline
+                </span>
+              </div>
+
+              <TextArea
+                placeholder="Write a message…"
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  if (e.shiftKey) return;
+                  e.preventDefault();
+                  e.currentTarget.form?.requestSubmit();
+                }}
+                onFocus={() => {
+                  try {
+                    wsRef.current?.send(
+                      JSON.stringify({ type: "typing.start", scope: "dm", threadId } satisfies WsClientMessage),
+                    );
+                  } catch {
+                    // ignore
+                  }
+                }}
+                onBlur={() => {
+                  try {
+                    wsRef.current?.send(
+                      JSON.stringify({ type: "typing.stop", scope: "dm", threadId } satisfies WsClientMessage),
+                    );
+                  } catch {
+                    // ignore
+                  }
+                }}
+              />
+            </div>
+
+            <Button type="submit" disabled={uploading || (!body.trim() && pendingUploads.length === 0)}>
+              {uploading ? "Uploading…" : "Send"}
+            </Button>
+          </div>
         </form>
 
         {pendingUploads.length ? (

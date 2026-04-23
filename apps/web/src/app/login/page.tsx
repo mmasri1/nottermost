@@ -22,7 +22,7 @@ export default function LoginPage() {
           <div className="authBrandMark">
             <div className="authLogo" aria-hidden="true" />
             <div>
-              <div className="authTitle">Nottermost</div>
+              <div className="authTitle authTitleAccent">Nottermost</div>
               <div className="authSubtitle">Sign in to continue</div>
             </div>
           </div>
