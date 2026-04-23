@@ -34,10 +34,6 @@ This file tracks which features are done, in progress, or not started.
 - [X] Engineering guidelines for contributors + AI (`ENGINEERING_GUIDELINES.md`)
 - [X] GitHub Pages entrypoint (`index.md` renders `README.md`)
 
----
-
-## Not implemented (not done)
-
 ### Channels
 - [X] Public/private channels
 - [X] Channel membership, invites
@@ -50,12 +46,8 @@ This file tracks which features are done, in progress, or not started.
 ### Messaging UX
 - [X] Mentions & notifications (`@user`, `@channel`, notification prefs)
 - [X] Reactions, edits, deletes (emoji reactions, edit/delete)
-- [ ] Pinning and saved items
 - [X] Typing indicators
-- [ ] Presence
-- [ ] Read states (unread counts, read markers, last-read)
 - [X] Light mode is default
-- [ ] Design exactly like Slack (layout + icons + overall look)
 
 ### Files
 - [X] Uploads, previews, retention, permissions
@@ -67,6 +59,10 @@ This file tracks which features are done, in progress, or not started.
 - [X] Display names, avatars, status, profile editing
 - [ ] Roles/permissions beyond “owner/member”, user deactivation, audits
 
+---
+
+## Not implemented (not done)
+
 ### Reliability / production hardening
 - [ ] Multi-instance WebSocket correctness (distributed subscription registry)
 - [ ] Guaranteed delivery semantics (ack/retry, offline delivery beyond history)
@@ -74,5 +70,3 @@ This file tracks which features are done, in progress, or not started.
 - [ ] Observability (metrics/tracing/log correlation IDs/dashboards)
 - [ ] Automated tests (unit/integration/e2e)
 - [ ] Production deployment implementation (canary/blue-green/rolling pipelines, secrets rotation, etc.)
-
-<!-- CHECKPOINT id="ckpt_moalleeq_9srsxw" time="2026-04-22T22:01:58.322Z" note="auto" fixes=0 questions=0 highlights=0 sections="" -->

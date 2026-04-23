@@ -1,24 +1,24 @@
 /* Light, mature theme (Slack-like neutrals). */
 :root {
-  --bg: #f8f8fa;
+  --bg: #f7f8fa;
   --panel: #ffffff;
-  --panel2: #f3f4f6;
-  --border: rgba(17, 24, 39, 0.14);
+  --panel2: #f1f5f9;
+  --border: rgba(15, 23, 42, 0.14);
   --border2: rgba(17, 24, 39, 0.08);
-  --text: #111827;
-  --muted: rgba(17, 24, 39, 0.62);
-  --muted2: rgba(17, 24, 39, 0.48);
-  --accent: #0b4fd6;
-  --accent2: rgba(11, 79, 214, 0.12);
+  --text: #0f172a;
+  --muted: rgba(15, 23, 42, 0.62);
+  --muted2: rgba(15, 23, 42, 0.48);
+  --accent: #0f766e;
+  --accent2: rgba(15, 118, 110, 0.14);
   --danger: #b42318;
-  --shadowSm: 0 1px 2px rgba(16, 24, 40, 0.08);
-  --shadowMd: 0 6px 18px rgba(16, 24, 40, 0.10);
+  --shadowSm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadowMd: 0 10px 24px rgba(15, 23, 42, 0.10);
 
-  --radiusSm: 10px;
-  --radiusMd: 12px;
-  --radiusLg: 16px;
+  --radiusSm: 8px;
+  --radiusMd: 10px;
+  --radiusLg: 12px;
 
-  --sidebarBg: #3a0d45;
+  --sidebarBg: #0f172a;
   --sidebarFg: rgba(255, 255, 255, 0.92);
   --sidebarMuted: rgba(255, 255, 255, 0.68);
   --sidebarHover: rgba(255, 255, 255, 0.10);
@@ -32,8 +32,6 @@ body {
 
 body {
   margin: 0;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
-    "Apple Color Emoji", "Segoe UI Emoji";
   background: var(--bg);
   color: var(--text);
 }
@@ -44,8 +42,8 @@ body {
   place-items: center;
   padding: 28px;
   background:
-    radial-gradient(800px 400px at 15% 10%, rgba(11, 79, 214, 0.10), transparent 60%),
-    radial-gradient(800px 500px at 85% 30%, rgba(58, 13, 69, 0.10), transparent 60%),
+    radial-gradient(900px 420px at 15% 10%, rgba(15, 118, 110, 0.11), transparent 60%),
+    radial-gradient(860px 520px at 85% 30%, rgba(15, 23, 42, 0.10), transparent 60%),
     var(--bg);
 }
 
@@ -141,6 +139,16 @@ a {
   box-shadow: var(--shadowSm);
   border-radius: var(--radiusMd);
   padding: 16px;
+  transition: box-shadow 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+.card:hover {
+  border-color: rgba(15, 23, 42, 0.16);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.10);
+}
+
+a.card:hover {
+  transform: translateY(-1px);
 }
 
 .row {
@@ -250,7 +258,7 @@ a {
   align-items: center;
   gap: 8px;
   padding: 8px;
-  border-radius: 10px;
+  border-radius: var(--radiusSm);
 }
 
 .uiLink:hover {
@@ -286,7 +294,7 @@ a {
   gap: 8px;
   align-items: center;
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: var(--radiusSm);
   color: inherit;
 }
 
@@ -351,8 +359,8 @@ a {
 }
 
 .reactionChip--me {
-  background: rgba(79, 70, 229, 0.12);
-  border-color: rgba(79, 70, 229, 0.35);
+  background: var(--accent2);
+  border-color: rgba(15, 118, 110, 0.35);
 }
 
 .reactionChip--ghost {
@@ -388,6 +396,47 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.topbarRight {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.notifBell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radiusSm);
+  border: 1px solid var(--border2);
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadowSm);
+}
+
+.notifBell:hover {
+  filter: brightness(0.99);
+}
+
+.notifBadge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: white;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+  border: 2px solid var(--panel);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
 }
 
 .topbarHint {
@@ -430,15 +479,17 @@ a {
 /* UI primitives */
 .uiButton {
   border: 1px solid transparent;
-  border-radius: 12px;
+  border-radius: 10px;
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.15px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   user-select: none;
+  transition: filter 120ms ease, background 120ms ease, border-color 120ms ease, box-shadow 120ms ease,
+    transform 120ms ease;
 }
 
 .uiButton--md {
@@ -459,10 +510,18 @@ a {
   box-shadow: var(--shadowSm);
 }
 
+.uiButton--primary:hover {
+  filter: brightness(0.96);
+}
+
 .uiButton--secondary {
   background: var(--panel);
   color: var(--text);
   border-color: var(--border);
+}
+
+.uiButton--secondary:hover {
+  background: rgba(15, 23, 42, 0.03);
 }
 
 .uiButton--ghost {
@@ -471,8 +530,22 @@ a {
   border-color: rgba(255, 255, 255, 0.20);
 }
 
+.uiButton--ghost:hover {
+  background: rgba(255, 255, 255, 0.08);
+  filter: none;
+}
+
 .uiButton:hover {
   filter: brightness(0.98);
+}
+
+.uiButton:active {
+  transform: translateY(0.5px);
+}
+
+.uiButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--accent2);
 }
 
 .uiButton--disabled {
@@ -483,7 +556,7 @@ a {
 .uiInput,
 .uiTextArea {
   width: 100%;
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--panel);
   color: var(--text);
@@ -495,7 +568,7 @@ a {
 
 .uiInput:focus,
 .uiTextArea:focus {
-  border-color: rgba(11, 79, 214, 0.55);
+  border-color: rgba(15, 118, 110, 0.55);
   box-shadow: 0 0 0 4px var(--accent2);
 }
 
