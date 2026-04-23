@@ -47,6 +47,7 @@ This file tracks which features are done, in progress, or not started.
 - [X] Mentions & notifications (`@user`, `@channel`, notification prefs)
 - [X] Reactions, edits, deletes (emoji reactions, edit/delete)
 - [X] Typing indicators
+- [X] Slack-like workspace pages + chat surfaces (message rows, headers, thread rail)
 - [X] Light mode is default
 
 ### Files

@@ -490,26 +490,26 @@ a.card:hover {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(15, 23, 42, 0.10);
-  border-radius: var(--radiusLg);
-  box-shadow: var(--shadowSm);
+  background: var(--panel);
+  border: 1px solid var(--border2);
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .chatScroll {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 12px;
+  padding: 10px 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 2px;
 }
 
 .chatComposer {
-  padding: 10px;
-  border-top: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.94);
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--border2);
+  background: var(--panel);
 }
 
 .chatComposerRow {
@@ -541,17 +541,17 @@ a.card:hover {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(15, 23, 42, 0.10);
-  border-radius: var(--radiusLg);
-  box-shadow: var(--shadowSm);
+  background: var(--panel);
+  border: 1px solid var(--border2);
+  border-radius: 0;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
 }
 
 .threadPanelHeader {
   padding: 10px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  border-bottom: 1px solid var(--border2);
   display: flex;
   justify-content: space-between;
   gap: 10px;
@@ -566,6 +566,241 @@ a.card:hover {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+/* Slack-like chat page */
+.chatPage {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--border2);
+  border-radius: var(--radiusLg);
+  overflow: hidden;
+  box-shadow: var(--shadowSm);
+}
+
+.chatHeader {
+  height: 54px;
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px 0 14px;
+  border-bottom: 1px solid var(--border2);
+  background: var(--panel);
+}
+
+.chatHeaderTitle {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.chatHeaderPrimary {
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chatHeaderSecondary {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chatHeaderActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.chatLayout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.chatLayout--withThread {
+  grid-template-columns: 1fr 360px;
+}
+
+.chatMain {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border2);
+}
+
+.chatThreadRail {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+}
+
+/* Slack-like message row */
+.msgRow {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 10px;
+  padding: 8px 16px;
+}
+
+.msgRow:hover {
+  background: rgba(15, 23, 42, 0.03);
+}
+
+.msgAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(109, 40, 217, 0.12);
+  border: 1px solid rgba(109, 40, 217, 0.22);
+  color: rgba(15, 23, 42, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.msgBody {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.msgMeta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.msgMetaLeft {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.msgSender {
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.msgTimestamp {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.msgActions {
+  display: none;
+  gap: 6px;
+  align-items: center;
+}
+
+.msgRow:hover .msgActions {
+  display: inline-flex;
+}
+
+.msgText {
+  white-space: pre-wrap;
+  line-height: 1.45;
+  color: rgba(15, 23, 42, 0.92);
+}
+
+.msgDeleted {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.msgAttachments {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.msgReactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 2px;
+}
+
+.msgThreadMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+/* Slack-like non-chat pages (no random cards) */
+.slackPage {
+  background: var(--panel);
+  border: 1px solid var(--border2);
+  border-radius: var(--radiusLg);
+  box-shadow: var(--shadowSm);
+  overflow: hidden;
+}
+
+.slackPageHeader {
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border2);
+}
+
+.slackPageTitle {
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.slackPageSubtitle {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.slackPageBody {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.slackSection {
+  border: 1px solid var(--border2);
+  border-radius: var(--radiusMd);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.03);
+  padding: 12px;
+}
+
+.slackSectionTitle {
+  font-weight: 700;
+  margin-bottom: 10px;
 }
 
 /* UI primitives */

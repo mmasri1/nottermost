@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import type { ChannelInvite, ChannelListItem, DirectThread } from "@nottermost/shared";
 import { apiFetch } from "../../../../lib/api";
-import { WorkspaceHeader } from "../../../../components/AppShell/WorkspaceHeader";
 import { Button } from "../../../../components/ui/Button";
 import { Input } from "../../../../components/ui/Input";
 
@@ -71,13 +70,18 @@ export default function WorkspacePage() {
 
   return (
     <div style={{ padding: 16, overflow: "auto" }}>
-      <WorkspaceHeader title="Workspace" subtitle={workspaceId} />
+      <div className="slackPage">
+        <div className="slackPageHeader">
+          <div>
+            <div className="slackPageTitle">Workspace</div>
+            <div className="slackPageSubtitle">{workspaceId}</div>
+          </div>
+          {error ? <div className="topbarError">Error: {error}</div> : null}
+        </div>
 
-      <div className="card col" style={{ marginTop: 12 }}>
-        {error ? <div className="error">Error: {error}</div> : null}
-
-        <div className="col" style={{ gap: 10 }}>
-          <div className="muted">Channels</div>
+        <div className="slackPageBody">
+          <div className="slackSection">
+            <div className="slackSectionTitle">Channels</div>
 
           <div className="row" style={{ alignItems: "center" }}>
             <Input placeholder="new-channel" value={newChannelName} onChange={(e) => setNewChannelName(e.target.value)} />
@@ -168,112 +172,107 @@ export default function WorkspacePage() {
               </div>
             ))
           )}
-        </div>
-
-        <div style={{ height: 1, background: "rgba(17,24,39,0.08)" }} />
-
-        <div className="col" style={{ gap: 8 }}>
-          <div className="muted">Channel invites</div>
-          {invites.length === 0 ? (
-            <div className="muted">No pending invites.</div>
-          ) : (
-            invites.map((i) => (
-              <div key={i.id} className="row" style={{ justifyContent: "space-between" }}>
-                <div className="col" style={{ gap: 2 }}>
-                  <div>
-                    Invite to <b>{i.channelName}</b>
-                  </div>
-                  <div className="muted" style={{ fontSize: 12 }}>
-                    from {i.inviterEmail} · {new Date(i.createdAt).toLocaleString()}
-                  </div>
-                </div>
-                <Button
-                  variant="secondary"
-                  onClick={async () => {
-                    setError(null);
-                    try {
-                      await apiFetch<void>(`/channels/invites/${i.id}/accept`, { method: "POST" });
-                      setInvites((prev) => prev.filter((x) => x.id !== i.id));
-                      const ch = channels.find((c) => c.id === i.channelId);
-                      if (ch) setChannels((prev) => prev.map((x) => (x.id === ch.id ? { ...x, isMember: true } : x)));
-                      router.push(`/app/workspaces/${workspaceId}/channels/${i.channelId}`);
-                    } catch (err) {
-                      setError(err instanceof Error ? err.message : "accept_failed");
-                    }
-                  }}
-                >
-                  Accept
-                </Button>
-              </div>
-            ))
-          )}
-        </div>
-
-        <div style={{ height: 1, background: "rgba(17,24,39,0.08)" }} />
-
-        <div className="col" style={{ gap: 6 }}>
-          <div className="muted">Members</div>
-          {members.length === 0 ? (
-            <div className="muted">No members found.</div>
-          ) : (
-            members.map((m) => (
-              <div key={m.id} className="row" style={{ justifyContent: "space-between" }}>
-                <div className="col" style={{ gap: 2 }}>
-                  <div>{m.displayName?.trim() || m.email}</div>
-                  <div className="muted" style={{ fontSize: 12 }}>
-                    {m.email} · {m.id} · {m.role}
-                    {m.statusText?.trim() ? ` · ${m.statusText.trim()}` : ""}
-                  </div>
-                </div>
-                <Button
-                  variant="secondary"
-                  disabled={!me || me.id === m.id}
-                  onClick={async () => {
-                    setError(null);
-                    try {
-                      const thread = await apiFetch<DirectThread>("/dm/threads", {
-                        method: "POST",
-                        body: JSON.stringify({ workspaceId, otherUserId: m.id }),
-                      });
-                      router.push(`/app/workspaces/${workspaceId}/threads/${thread.id}`);
-                    } catch (err) {
-                      setError(err instanceof Error ? err.message : "thread_failed");
-                    }
-                  }}
-                >
-                  DM
-                </Button>
-              </div>
-            ))
-          )}
-        </div>
-
-        <div style={{ height: 1, background: "rgba(17,24,39,0.08)" }} />
-
-        <div className="col" style={{ gap: 8 }}>
-          <div className="muted">Add member (owner-only)</div>
-          <div className="row">
-            <Input placeholder="email@domain.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-            <Button
-              onClick={async () => {
-                setError(null);
-                try {
-                  const member = await apiFetch<Member>(`/workspaces/${workspaceId}/members`, {
-                    method: "POST",
-                    body: JSON.stringify({ email }),
-                  });
-                  setMembers((prev) => [...prev, member]);
-                  setEmail("");
-                } catch (err) {
-                  setError(err instanceof Error ? err.message : "add_failed");
-                }
-              }}
-            >
-              Add
-            </Button>
           </div>
-          <div className="muted" style={{ fontSize: 12 }}>
-            Tip: create another account in a separate browser, then add it here by email.
+
+          <div className="slackSection">
+            <div className="slackSectionTitle">Channel invites</div>
+            {invites.length === 0 ? (
+              <div className="muted">No pending invites.</div>
+            ) : (
+              invites.map((i) => (
+                <div key={i.id} className="row" style={{ justifyContent: "space-between" }}>
+                  <div className="col" style={{ gap: 2 }}>
+                    <div>
+                      Invite to <b>{i.channelName}</b>
+                    </div>
+                    <div className="muted" style={{ fontSize: 12 }}>
+                      from {i.inviterEmail} · {new Date(i.createdAt).toLocaleString()}
+                    </div>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    onClick={async () => {
+                      setError(null);
+                      try {
+                        await apiFetch<void>(`/channels/invites/${i.id}/accept`, { method: "POST" });
+                        setInvites((prev) => prev.filter((x) => x.id !== i.id));
+                        const ch = channels.find((c) => c.id === i.channelId);
+                        if (ch) setChannels((prev) => prev.map((x) => (x.id === ch.id ? { ...x, isMember: true } : x)));
+                        router.push(`/app/workspaces/${workspaceId}/channels/${i.channelId}`);
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : "accept_failed");
+                      }
+                    }}
+                  >
+                    Accept
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="slackSection">
+            <div className="slackSectionTitle">Members</div>
+            {members.length === 0 ? (
+              <div className="muted">No members found.</div>
+            ) : (
+              members.map((m) => (
+                <div key={m.id} className="row" style={{ justifyContent: "space-between" }}>
+                  <div className="col" style={{ gap: 2 }}>
+                    <div>{m.displayName?.trim() || m.email}</div>
+                    <div className="muted" style={{ fontSize: 12 }}>
+                      {m.email} · {m.id} · {m.role}
+                      {m.statusText?.trim() ? ` · ${m.statusText.trim()}` : ""}
+                    </div>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    disabled={!me || me.id === m.id}
+                    onClick={async () => {
+                      setError(null);
+                      try {
+                        const thread = await apiFetch<DirectThread>("/dm/threads", {
+                          method: "POST",
+                          body: JSON.stringify({ workspaceId, otherUserId: m.id }),
+                        });
+                        router.push(`/app/workspaces/${workspaceId}/threads/${thread.id}`);
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : "thread_failed");
+                      }
+                    }}
+                  >
+                    DM
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="slackSection">
+            <div className="slackSectionTitle">Add member (owner-only)</div>
+            <div className="row">
+              <Input placeholder="email@domain.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <Button
+                onClick={async () => {
+                  setError(null);
+                  try {
+                    const member = await apiFetch<Member>(`/workspaces/${workspaceId}/members`, {
+                      method: "POST",
+                      body: JSON.stringify({ email }),
+                    });
+                    setMembers((prev) => [...prev, member]);
+                    setEmail("");
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : "add_failed");
+                  }
+                }}
+              >
+                Add
+              </Button>
+            </div>
+            <div className="muted" style={{ fontSize: 12 }}>
+              Tip: create another account in a separate browser, then add it here by email.
+            </div>
           </div>
         </div>
       </div>

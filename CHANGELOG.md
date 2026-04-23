@@ -55,11 +55,12 @@ The format is based on **Keep a Changelog**, and this project aims to follow **S
 - README tightened while preserving architecture; added operational maturity, production deployments, incident handling, scaling, and real-environment monitoring sections
 - README: add local Docker development instructions
 - Web UI: updated typography and refreshed the light theme (teal/slate), including less-rounded cards/inputs/buttons
-- Web UI: overhauled chat layout and composer for a more usable, Slack-like experience; refined auth pages to match
+- Web UI: overhauled chat layout and composer for a more usable, Slack-like experience; aligned workspace pages with the same “Slack-like” UI primitives
 
 ### Fixed
 - Local Docker builds: avoid `workspace:*` dependency spec in container npm installs
 - API startup in Docker: initialize Prisma only after dev schema sync/generate
 - Channel thread pane: “Load older” for paginated thread replies
 - Local Docker dev images: improved npm install reliability and caching for the monorepo Dockerfiles
+- Channels: fix `useMemo is not defined` crash in `ChatMessageRow`
 

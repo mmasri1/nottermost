@@ -6,9 +6,8 @@ import type { ChannelMessage, CursorPage, WsClientMessage, WsServerMessage } fro
 import { apiFetch, apiUploadFile, getToken } from "../../../../../../lib/api";
 import { mergeReactionWs } from "../../../../../../lib/reactions";
 import { ChatMessageRow } from "../../../../../../components/chat/ChatMessageRow";
-import { WorkspaceHeader } from "../../../../../../components/AppShell/WorkspaceHeader";
 import { Button } from "../../../../../../components/ui/Button";
-import { Input, TextArea } from "../../../../../../components/ui/Input";
+import { TextArea } from "../../../../../../components/ui/Input";
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:4000/ws";
 
@@ -20,7 +19,6 @@ export default function ChannelPage() {
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [body, setBody] = useState("");
-  const [inviteEmail, setInviteEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const [openThreadRootId, setOpenThreadRootId] = useState<string | null>(null);
@@ -202,296 +200,263 @@ export default function ChannelPage() {
 
   return (
     <div style={{ padding: 16, height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
-      <WorkspaceHeader title="# Channel" subtitle={`workspace ${workspaceId} · channel ${channelId}`} />
-
-      <div className="card col" style={{ gap: 12, marginTop: 12, flex: 1, minHeight: 0, overflow: "hidden" }}>
-        {error ? <div className="error">Error: {error}</div> : null}
-
-        <div className="chatMetaRow">
-          <Button variant="secondary" disabled={!nextCursor} onClick={() => void loadOlder()}>
-            Load older
-          </Button>
-          <div className="muted" style={{ fontSize: 12 }}>
-            {messages.length} messages
+      <div className="chatPage">
+        <div className="chatHeader">
+          <div className="chatHeaderTitle">
+            <div className="chatHeaderPrimary"># channel</div>
+            <div className="chatHeaderSecondary">workspace {workspaceId} · channel {channelId}</div>
+          </div>
+          <div className="chatHeaderActions">
+            {error ? <span className="topbarError">Error: {error}</span> : null}
+            <Button variant="secondary" disabled={!nextCursor} onClick={() => void loadOlder()}>
+              Load older
+            </Button>
           </div>
         </div>
 
-        <div className={["chatPanelGrid", openThreadRootId ? "chatPanelGrid--withThread" : ""].filter(Boolean).join(" ")}>
-          <div className="chatSurface">
-            <div className="chatScroll">
-              {messages.length === 0 ? <div className="muted">No messages yet.</div> : null}
-              {messages.map((m) => (
-                <ChatMessageRow
-                  key={m.id}
-                  variant="channel"
-                  channelId={channelId}
-                  message={m}
-                  myUserId={myUserId}
-                  onError={(err) => setError(err)}
-                  showReply
-                  onOpenThread={() => {
-                    setOpenThreadRootId(m.id);
-                    setThreadBody("");
-                    void loadThreadFirstPage(m.id).catch((err) =>
-                      setError(err instanceof Error ? err.message : "load_thread_failed"),
-                    );
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-
-          {openThreadRootId ? (
-            <div className="threadPanel">
-              <div className="threadPanelHeader">
-                <div className="col" style={{ gap: 2 }}>
-                  <div style={{ fontWeight: 650 }}>Thread</div>
-                  <div className="muted" style={{ fontSize: 12 }}>
-                    {rootMessage ? rootMessage.body.slice(0, 60) : openThreadRootId}
-                  </div>
-                </div>
-                <Button size="sm" variant="secondary" type="button" onClick={() => setOpenThreadRootId(null)}>
-                  Close
-                </Button>
-              </div>
-
-              <div className="threadPanelBody">
-                {threadCursor ? (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    type="button"
-                    onClick={async () => {
-                      setError(null);
-                      try {
-                        await loadThreadOlder();
-                      } catch (err) {
-                        setError(err instanceof Error ? err.message : "load_thread_older_failed");
-                      }
+        <div className={["chatLayout", openThreadRootId ? "chatLayout--withThread" : ""].filter(Boolean).join(" ")}>
+          <div className="chatMain">
+            <div className="chatSurface" style={{ border: "none" }}>
+              <div className="chatScroll">
+                {messages.length === 0 ? <div className="muted" style={{ padding: "0 16px" }}>No messages yet.</div> : null}
+                {messages.map((m) => (
+                  <ChatMessageRow
+                    key={m.id}
+                    variant="channel"
+                    channelId={channelId}
+                    message={m}
+                    myUserId={myUserId}
+                    onError={(err) => setError(err)}
+                    showReply
+                    onOpenThread={() => {
+                      setOpenThreadRootId(m.id);
+                      setThreadBody("");
+                      void loadThreadFirstPage(m.id).catch((err) =>
+                        setError(err instanceof Error ? err.message : "load_thread_failed"),
+                      );
                     }}
-                  >
-                    Load older
-                  </Button>
-                ) : null}
-
-                {threadMessages.length === 0 ? (
-                  <div className="muted">No replies yet.</div>
-                ) : (
-                  threadMessages.map((m) => (
-                    <ChatMessageRow
-                      key={m.id}
-                      variant="channel"
-                      channelId={channelId}
-                      message={m}
-                      myUserId={myUserId}
-                      onError={(err) => setError(err)}
-                      showReply={false}
-                    />
-                  ))
-                )}
+                  />
+                ))}
               </div>
+            </div>
 
-              <form
-                className="chatComposer"
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const trimmed = threadBody.trim();
-                  if (!trimmed || !openThreadRootId) return;
-                  setThreadBody("");
-                  try {
-                    await apiFetch<ChannelMessage>(`/channels/${channelId}/messages`, {
-                      method: "POST",
-                      body: JSON.stringify({ body: trimmed, threadRootId: openThreadRootId }),
-                    });
-                  } catch (err) {
-                    setError(err instanceof Error ? err.message : "reply_failed");
-                  }
-                }}
-              >
-                <div className="chatComposerRow">
+            <form
+              className="chatComposer"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setError(null);
+                const trimmed = body.trim();
+                if (!trimmed && pendingUploads.length === 0) return;
+                setBody("");
+                try {
+                  await apiFetch<ChannelMessage>(`/channels/${channelId}/messages`, {
+                    method: "POST",
+                    body: JSON.stringify({ body: trimmed || " ", fileIds: pendingUploads.map((f) => f.id) }),
+                  });
+                  setPendingUploads([]);
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : "send_failed");
+                }
+              }}
+            >
+              <div className="chatComposerRow">
+                <div className="col" style={{ gap: 8 }}>
+                  <div className="row" style={{ justifyContent: "space-between" }}>
+                    <label className="uiLink" style={{ cursor: uploading ? "not-allowed" : "pointer" }}>
+                      Attach
+                      <input
+                        type="file"
+                        multiple
+                        disabled={uploading}
+                        style={{ display: "none" }}
+                        onChange={async (e) => {
+                          const files = Array.from(e.target.files ?? []);
+                          if (!files.length) return;
+                          e.target.value = "";
+                          setUploading(true);
+                          try {
+                            for (const f of files) {
+                              const uploaded = await apiUploadFile({ workspaceId, channelId, file: f });
+                              setPendingUploads((prev) => [
+                                ...prev,
+                                {
+                                  id: uploaded.id,
+                                  filename: uploaded.filename,
+                                  url: uploaded.url,
+                                  sizeBytes: uploaded.sizeBytes,
+                                  contentType: uploaded.contentType,
+                                },
+                              ]);
+                            }
+                          } catch (err) {
+                            setError(err instanceof Error ? err.message : "upload_failed");
+                          } finally {
+                            setUploading(false);
+                          }
+                        }}
+                      />
+                    </label>
+                    <span className="muted" style={{ fontSize: 12 }}>
+                      Enter to send · Shift+Enter for newline
+                    </span>
+                  </div>
+
                   <TextArea
-                    placeholder="Reply…"
-                    value={threadBody}
-                    onChange={(e) => setThreadBody(e.target.value)}
+                    placeholder="Write a message…"
+                    value={body}
+                    onChange={(e) => setBody(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key !== "Enter") return;
                       if (e.shiftKey) return;
                       e.preventDefault();
-                      e.currentTarget.form?.requestSubmit();
+                      const form = e.currentTarget.form;
+                      if (!form) return;
+                      form.requestSubmit();
                     }}
-                  />
-                  <Button type="submit" disabled={!threadBody.trim()}>
-                    Reply
-                  </Button>
-                </div>
-              </form>
-            </div>
-          ) : null}
-        </div>
-
-        <form
-          className="chatComposer"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setError(null);
-            const trimmed = body.trim();
-            if (!trimmed && pendingUploads.length === 0) return;
-            setBody("");
-            try {
-              await apiFetch<ChannelMessage>(`/channels/${channelId}/messages`, {
-                method: "POST",
-                body: JSON.stringify({ body: trimmed || " ", fileIds: pendingUploads.map((f) => f.id) }),
-              });
-              setPendingUploads([]);
-            } catch (err) {
-              setError(err instanceof Error ? err.message : "send_failed");
-            }
-          }}
-        >
-          <div className="chatComposerRow">
-            <div className="col" style={{ gap: 8 }}>
-              <div className="row" style={{ justifyContent: "space-between" }}>
-                <label className="uiLink" style={{ cursor: uploading ? "not-allowed" : "pointer" }}>
-                  Attach
-                  <input
-                    type="file"
-                    multiple
-                    disabled={uploading}
-                    style={{ display: "none" }}
-                    onChange={async (e) => {
-                      const files = Array.from(e.target.files ?? []);
-                      if (!files.length) return;
-                      e.target.value = "";
-                      setUploading(true);
+                    onFocus={() => {
                       try {
-                        for (const f of files) {
-                          const uploaded = await apiUploadFile({ workspaceId, channelId, file: f });
-                          setPendingUploads((prev) => [
-                            ...prev,
-                            {
-                              id: uploaded.id,
-                              filename: uploaded.filename,
-                              url: uploaded.url,
-                              sizeBytes: uploaded.sizeBytes,
-                              contentType: uploaded.contentType,
-                            },
-                          ]);
-                        }
-                      } catch (err) {
-                        setError(err instanceof Error ? err.message : "upload_failed");
-                      } finally {
-                        setUploading(false);
+                        wsRef.current?.send(
+                          JSON.stringify({ type: "typing.start", scope: "channel", channelId } satisfies WsClientMessage),
+                        );
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                    onBlur={() => {
+                      try {
+                        wsRef.current?.send(
+                          JSON.stringify({ type: "typing.stop", scope: "channel", channelId } satisfies WsClientMessage),
+                        );
+                      } catch {
+                        // ignore
                       }
                     }}
                   />
-                </label>
-                <span className="muted" style={{ fontSize: 12 }}>
-                  Enter to send · Shift+Enter for newline
-                </span>
-              </div>
-
-              <TextArea
-                placeholder="Write a message…"
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter") return;
-                  if (e.shiftKey) return;
-                  e.preventDefault();
-                  const form = e.currentTarget.form;
-                  if (!form) return;
-                  form.requestSubmit();
-                }}
-                onFocus={() => {
-                  try {
-                    wsRef.current?.send(
-                      JSON.stringify({ type: "typing.start", scope: "channel", channelId } satisfies WsClientMessage),
-                    );
-                  } catch {
-                    // ignore
-                  }
-                }}
-                onBlur={() => {
-                  try {
-                    wsRef.current?.send(
-                      JSON.stringify({ type: "typing.stop", scope: "channel", channelId } satisfies WsClientMessage),
-                    );
-                  } catch {
-                    // ignore
-                  }
-                }}
-              />
-            </div>
-            <Button type="submit" disabled={uploading || (!body.trim() && pendingUploads.length === 0)}>
-              {uploading ? "Uploading…" : "Send"}
-            </Button>
-          </div>
-        </form>
-
-        {pendingUploads.length ? (
-          <div className="col" style={{ gap: 6 }}>
-            <div className="muted" style={{ fontSize: 12 }}>
-              Attachments to send
-            </div>
-            {pendingUploads.map((f) => (
-              <div key={f.id} className="row" style={{ justifyContent: "space-between" }}>
-                <a className="uiLink" href={f.url} target="_blank" rel="noreferrer">
-                  {f.filename}
-                </a>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  type="button"
-                  onClick={() => setPendingUploads((p) => p.filter((x) => x.id !== f.id))}
-                >
-                  Remove
+                </div>
+                <Button type="submit" disabled={uploading || (!body.trim() && pendingUploads.length === 0)}>
+                  {uploading ? "Uploading…" : "Send"}
                 </Button>
               </div>
-            ))}
-          </div>
-        ) : null}
 
-        {typingUsers.size ? (
-          <div className="muted" style={{ fontSize: 12 }}>
-            Typing: {Array.from(typingUsers).join(", ")}
-          </div>
-        ) : null}
+              {pendingUploads.length ? (
+                <div className="col" style={{ gap: 6, marginTop: 10 }}>
+                  <div className="muted" style={{ fontSize: 12 }}>
+                    Attachments to send
+                  </div>
+                  {pendingUploads.map((f) => (
+                    <div key={f.id} className="row" style={{ justifyContent: "space-between" }}>
+                      <a className="uiLink" href={f.url} target="_blank" rel="noreferrer">
+                        {f.filename}
+                      </a>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        type="button"
+                        onClick={() => setPendingUploads((p) => p.filter((x) => x.id !== f.id))}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
 
-        <div style={{ height: 1, background: "rgba(17,24,39,0.08)" }} />
+              {typingUsers.size ? (
+                <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+                  Typing: {Array.from(typingUsers).join(", ")}
+                </div>
+              ) : null}
+            </form>
+          </div>
 
-        <div className="col" style={{ gap: 8 }}>
-          <div className="muted">Invite workspace member by email</div>
-          <div className="row">
-            <Input
-              placeholder="email@domain.com"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-            />
-            <Button
-              variant="secondary"
-              type="button"
-              disabled={!inviteEmail.trim()}
-              onClick={async () => {
-                setError(null);
-                const trimmed = inviteEmail.trim();
-                if (!trimmed) return;
-                try {
-                  await apiFetch<{ id: string }>(`/channels/${channelId}/invites`, {
-                    method: "POST",
-                    body: JSON.stringify({ email: trimmed }),
-                  });
-                  setInviteEmail("");
-                } catch (err) {
-                  setError(err instanceof Error ? err.message : "invite_failed");
-                }
-              }}
-            >
-              Invite
-            </Button>
-          </div>
-          <div className="muted" style={{ fontSize: 12 }}>
-            For private channels, invited users must accept (or can use “Join” after being invited).
-          </div>
+          {openThreadRootId ? (
+            <div className="chatThreadRail">
+              <div className="threadPanel" style={{ border: "none", borderLeft: "1px solid var(--border2)" }}>
+                <div className="threadPanelHeader">
+                  <div className="col" style={{ gap: 2 }}>
+                    <div style={{ fontWeight: 700 }}>Thread</div>
+                    <div className="muted" style={{ fontSize: 12 }}>
+                      {rootMessage ? rootMessage.body.slice(0, 60) : openThreadRootId}
+                    </div>
+                  </div>
+                  <Button size="sm" variant="secondary" type="button" onClick={() => setOpenThreadRootId(null)}>
+                    Close
+                  </Button>
+                </div>
+
+                <div className="threadPanelBody">
+                  {threadCursor ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      type="button"
+                      onClick={async () => {
+                        setError(null);
+                        try {
+                          await loadThreadOlder();
+                        } catch (err) {
+                          setError(err instanceof Error ? err.message : "load_thread_older_failed");
+                        }
+                      }}
+                    >
+                      Load older
+                    </Button>
+                  ) : null}
+
+                  {threadMessages.length === 0 ? (
+                    <div className="muted">No replies yet.</div>
+                  ) : (
+                    threadMessages.map((m) => (
+                      <ChatMessageRow
+                        key={m.id}
+                        variant="channel"
+                        channelId={channelId}
+                        message={m}
+                        myUserId={myUserId}
+                        onError={(err) => setError(err)}
+                        showReply={false}
+                      />
+                    ))
+                  )}
+                </div>
+
+                <form
+                  className="chatComposer"
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const trimmed = threadBody.trim();
+                    if (!trimmed || !openThreadRootId) return;
+                    setThreadBody("");
+                    try {
+                      await apiFetch<ChannelMessage>(`/channels/${channelId}/messages`, {
+                        method: "POST",
+                        body: JSON.stringify({ body: trimmed, threadRootId: openThreadRootId }),
+                      });
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : "reply_failed");
+                    }
+                  }}
+                >
+                  <div className="chatComposerRow">
+                    <TextArea
+                      placeholder="Reply…"
+                      value={threadBody}
+                      onChange={(e) => setThreadBody(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key !== "Enter") return;
+                        if (e.shiftKey) return;
+                        e.preventDefault();
+                        e.currentTarget.form?.requestSubmit();
+                      }}
+                    />
+                    <Button type="submit" disabled={!threadBody.trim()}>
+                      Reply
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

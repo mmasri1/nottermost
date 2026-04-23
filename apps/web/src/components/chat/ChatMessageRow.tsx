@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ChannelMessage, Message, MessageReactionSummary } from "@nottermost/shared";
 import { apiFetch } from "../../lib/api";
 import { Button } from "../ui/Button";
@@ -117,37 +117,37 @@ export function ChatMessageRow(props: Props) {
   }, [message.createdAt]);
 
   return (
-    <div
-      style={{
-        padding: 10,
-        border: "1px solid rgba(15, 23, 42, 0.08)",
-        borderRadius: "var(--radiusLg)",
-        background: "rgba(255,255,255,0.92)",
-        boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
-      }}
-    >
-      <div className="row" style={{ justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
-        <div className="row" style={{ gap: 8, alignItems: "baseline" }}>
-          <span style={{ fontWeight: 600 }}>{message.senderId}</span>
-          <span className="muted" style={{ fontSize: 12 }}>
-            {createdAtLabel}
-            {message.editedAt ? <span> · edited</span> : null}
-          </span>
-        </div>
-        {!deleted && isMine && !editing ? (
-          <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
-            <Button size="sm" variant="secondary" type="button" onClick={() => setEditing(true)}>
-              Edit
-            </Button>
-            <Button size="sm" variant="secondary" type="button" onClick={() => void removeMessage()}>
-              Delete
-            </Button>
-          </div>
-        ) : null}
+    <div className={["msgRow", deleted ? "msgRow--deleted" : ""].filter(Boolean).join(" ")}>
+      <div className="msgAvatar" aria-hidden="true">
+        {String(message.senderId ?? "?")
+          .slice(0, 1)
+          .toUpperCase()}
       </div>
 
-      {editing && isMine && !deleted ? (
-        <div className="col" style={{ gap: 8 }}>
+      <div className="msgBody">
+        <div className="msgMeta">
+          <div className="msgMetaLeft">
+            <span className="msgSender">{message.senderId}</span>
+            <span className="msgTimestamp">
+              {createdAtLabel}
+              {message.editedAt ? <span> · edited</span> : null}
+            </span>
+          </div>
+
+          {!deleted && isMine && !editing ? (
+            <div className="msgActions">
+              <Button size="sm" variant="secondary" type="button" onClick={() => setEditing(true)}>
+                Edit
+              </Button>
+              <Button size="sm" variant="secondary" type="button" onClick={() => void removeMessage()}>
+                Delete
+              </Button>
+            </div>
+          ) : null}
+        </div>
+
+        {editing && isMine && !deleted ? (
+          <div className="col" style={{ gap: 8 }}>
           <TextArea value={draft} onChange={(e) => setDraft(e.target.value)} />
           <div className="row" style={{ gap: 8 }}>
             <Button size="sm" disabled={saving || !draft.trim()} onClick={() => void saveEdit()}>
@@ -166,27 +166,25 @@ export function ChatMessageRow(props: Props) {
               Cancel
             </Button>
           </div>
-        </div>
-      ) : deleted ? (
-        <div className="muted" style={{ fontStyle: "italic" }}>
-          This message was deleted.
-        </div>
-      ) : (
-        <div style={{ marginTop: 6, whiteSpace: "pre-wrap", lineHeight: 1.45 }}>{message.body}</div>
-      )}
+          </div>
+        ) : deleted ? (
+          <div className="msgDeleted">This message was deleted.</div>
+        ) : (
+          <div className="msgText">{message.body}</div>
+        )}
 
-      {message.attachments?.length ? (
-        <div className="col" style={{ gap: 6, marginTop: 4 }}>
-          {message.attachments.map((a) => (
-            <a key={a.id} className="uiLink" href={a.url} target="_blank" rel="noreferrer">
-              {a.filename}
-            </a>
-          ))}
-        </div>
-      ) : null}
+        {message.attachments?.length ? (
+          <div className="msgAttachments">
+            {message.attachments.map((a) => (
+              <a key={a.id} className="uiLink" href={a.url} target="_blank" rel="noreferrer">
+                {a.filename}
+              </a>
+            ))}
+          </div>
+        ) : null}
 
-      {!deleted ? (
-        <div className="row" style={{ gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 4 }}>
+        {!deleted ? (
+          <div className="msgReactions">
           {reactions.map((r) => (
             <button
               key={r.emoji}
@@ -210,11 +208,11 @@ export function ChatMessageRow(props: Props) {
               </button>
             ),
           )}
-        </div>
-      ) : null}
+          </div>
+        ) : null}
 
-      {variant === "channel" && props.showReply && props.onOpenThread ? (
-        <div className="row" style={{ gap: 10, flexWrap: "wrap", marginTop: 8, alignItems: "center" }}>
+        {variant === "channel" && props.showReply && props.onOpenThread ? (
+          <div className="msgThreadMeta">
           <Button size="sm" variant="secondary" type="button" onClick={props.onOpenThread}>
             Reply{replyCount ? ` · ${replyCount}` : ""}
           </Button>
@@ -229,8 +227,9 @@ export function ChatMessageRow(props: Props) {
               })}
             </span>
           ) : null}
-        </div>
-      ) : null}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
