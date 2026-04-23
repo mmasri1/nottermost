@@ -8,7 +8,6 @@ import type { ChannelListItem } from "@nottermost/shared";
 import { apiFetch } from "../../../../lib/api";
 import { AppShell } from "../../../../components/AppShell/AppShell";
 
-type Member = { id: string; email: string; role: string };
 type DmThreadListItem = {
   id: string;
   workspaceId: string;
@@ -25,9 +24,14 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
   const workspaceId = useMemo(() => params.workspaceId, [params.workspaceId]);
 
   const [channels, setChannels] = useState<ChannelListItem[]>([]);
-  const [members, setMembers] = useState<Member[]>([]);
   const [dmThreads, setDmThreads] = useState<DmThreadListItem[]>([]);
-  const [me, setMe] = useState<{ id: string; email: string } | null>(null);
+  const [me, setMe] = useState<{
+    id: string;
+    email: string;
+    displayName?: string | null;
+    avatarUrl?: string | null;
+    statusText?: string | null;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [unreadNotifs, setUnreadNotifs] = useState<number>(0);
 
@@ -36,17 +40,21 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
     async function load() {
       setError(null);
       try {
-        const [meResp, chansResp, memResp] = await Promise.all([
-          apiFetch<{ id: string; email: string }>("/workspaces/me"),
+        const [meResp, chansResp] = await Promise.all([
+          apiFetch<{
+            id: string;
+            email: string;
+            displayName?: string | null;
+            avatarUrl?: string | null;
+            statusText?: string | null;
+          }>("/workspaces/me"),
           apiFetch<ChannelListItem[]>(`/channels?workspaceId=${encodeURIComponent(workspaceId)}`),
-          apiFetch<Member[]>(`/workspaces/${workspaceId}/members`),
         ]);
         const dmResp = await apiFetch<DmThreadListItem[]>(`/dm/threads?workspaceId=${encodeURIComponent(workspaceId)}`);
         const notifResp = await apiFetch<NotifList>(`/notifications?workspaceId=${encodeURIComponent(workspaceId)}&limit=50`);
         if (cancelled) return;
         setMe(meResp);
         setChannels(chansResp);
-        setMembers(memResp);
         setDmThreads(dmResp);
         setUnreadNotifs(notifResp.items.filter((n) => !n.readAt).length);
       } catch (err) {
@@ -58,6 +66,28 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, [workspaceId]);
+
+  useEffect(() => {
+    function onProfileUpdated() {
+      void (async () => {
+        try {
+          const meResp = await apiFetch<{
+            id: string;
+            email: string;
+            displayName?: string | null;
+            avatarUrl?: string | null;
+            statusText?: string | null;
+          }>("/workspaces/me");
+          setMe(meResp);
+        } catch {
+          // ignore: workspace shell already surfaces load errors on navigation/refresh
+        }
+      })();
+    }
+
+    window.addEventListener("nottermost.profile.updated", onProfileUpdated);
+    return () => window.removeEventListener("nottermost.profile.updated", onProfileUpdated);
+  }, []);
 
   useEffect(() => {
     try {
@@ -89,7 +119,9 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
 
   return (
     <AppShell
-      workspaceName={me ? me.email : null}
+      workspaceTitle={me ? me.displayName?.trim() || me.email : null}
+      workspaceSubtitle={me?.statusText?.trim() ? me.statusText.trim() : workspaceId}
+      workspaceAvatarUrl={me?.avatarUrl?.trim() ? me.avatarUrl.trim() : null}
       workspaceId={workspaceId}
       header={
         <div className="topbar">
@@ -103,6 +135,10 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
         {
           title: "Search",
           items: [{ key: "search", href: `/app/workspaces/${workspaceId}/search`, label: "Search messages" }],
+        },
+        {
+          title: "You",
+          items: [{ key: "profile", href: `/app/workspaces/${workspaceId}/profile`, label: "Profile" }],
         },
         { title: "Channels", items: channelItems },
         { title: "Direct messages", items: dmItems },

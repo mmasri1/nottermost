@@ -12,6 +12,9 @@ model User {
   email        String             @unique
   passwordHash String
   createdAt    DateTime           @default(now())
+  displayName  String?
+  avatarUrl    String?
+  statusText   String?
 
   memberships  WorkspaceMember[]
   sentMessages Message[]
@@ -50,6 +53,10 @@ model WorkspaceMember {
   workspaceId String
   userId      String
   role        String
+  // When false, skip mention-style notifications for channel messages in this workspace.
+  notifyChannelMentions Boolean @default(true)
+  // When false, skip mention-style notifications for DM threads in this workspace.
+  notifyDmMentions Boolean @default(true)
 
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
