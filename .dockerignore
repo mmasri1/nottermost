@@ -1,0 +1,20 @@
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+**/.cache
+**/coverage
+**/*.log
+**/.DS_Store
+**/.env
+
+# Local tooling
+.git
+.github
+.cursor
+agent-transcripts
+
+# App/runtime data
+**/uploads
+postgres_data
+redis_data
