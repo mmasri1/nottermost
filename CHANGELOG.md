@@ -69,4 +69,5 @@ The format is based on **Keep a Changelog**, and this project aims to follow **S
 - Sidebar: fix Home item showing as active while in a channel/DM page
 - Top bar search: fix search icon overlapping placeholder/value on some browsers
 - Sidebar: pin Settings to the bottom (independent of channel/DM list height)
+- Workspace page: tighten button sizing/row layout and remove add-member tip text
 

@@ -13,6 +13,7 @@ This file tracks which features are done, in progress, or not started.
 - [X] List my workspaces
 - [X] View workspace members
 - [X] Add member by email (owner-only)
+- [X] Workspace overview page UX polish (compact actions)
 
 ### Direct messages (1:1)
 - [X] Create/find DM thread between two workspace members

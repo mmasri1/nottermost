@@ -83,8 +83,13 @@ export default function WorkspacePage() {
           <div className="slackSection">
             <div className="slackSectionTitle">Channels</div>
 
-          <div className="row" style={{ alignItems: "center" }}>
-            <Input placeholder="new-channel" value={newChannelName} onChange={(e) => setNewChannelName(e.target.value)} />
+          <div className="row" style={{ alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
+            <div className="row" style={{ alignItems: "center", flex: 1, minWidth: 260 }}>
+              <Input
+                placeholder="new-channel"
+                value={newChannelName}
+                onChange={(e) => setNewChannelName(e.target.value)}
+              />
             <label className="row muted" style={{ gap: 8, fontSize: 12 }}>
               <input
                 type="checkbox"
@@ -93,7 +98,10 @@ export default function WorkspacePage() {
               />
               Private
             </label>
+            </div>
+
             <Button
+              size="sm"
               onClick={async () => {
                 setError(null);
                 const trimmed = newChannelName.trim();
@@ -145,11 +153,16 @@ export default function WorkspacePage() {
                 </div>
                 <div className="row">
                   {c.isMember ? (
-                    <Button variant="secondary" onClick={() => router.push(`/app/workspaces/${workspaceId}/channels/${c.id}`)}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => router.push(`/app/workspaces/${workspaceId}/channels/${c.id}`)}
+                    >
                       Open
                     </Button>
                   ) : (
                     <Button
+                      size="sm"
                       variant="secondary"
                       onClick={async () => {
                         setError(null);
@@ -223,6 +236,7 @@ export default function WorkspacePage() {
                     </div>
                   </div>
                   <Button
+                    size="sm"
                     variant="secondary"
                     disabled={!me || me.id === m.id}
                     onClick={async () => {
@@ -247,9 +261,10 @@ export default function WorkspacePage() {
 
           <div className="slackSection">
             <div className="slackSectionTitle">Add member (owner-only)</div>
-            <div className="row">
+            <div className="row" style={{ alignItems: "center", flexWrap: "wrap" }}>
               <Input placeholder="email@domain.com" value={email} onChange={(e) => setEmail(e.target.value)} />
               <Button
+                size="sm"
                 onClick={async () => {
                   setError(null);
                   try {
@@ -266,9 +281,6 @@ export default function WorkspacePage() {
               >
                 Add
               </Button>
-            </div>
-            <div className="muted" style={{ fontSize: 12 }}>
-              Tip: create another account in a separate browser, then add it here by email.
             </div>
           </div>
         </div>
