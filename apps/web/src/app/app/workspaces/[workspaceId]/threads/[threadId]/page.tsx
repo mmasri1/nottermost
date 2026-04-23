@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import type { CursorPage, Message, WsClientMessage, WsServerMessage } from "@nottermost/shared";
 import { apiFetch, apiUploadFile, getToken } from "../../../../../../lib/api";
+import { mergeReactionWs } from "../../../../../../lib/reactions";
+import { ChatMessageRow } from "../../../../../../components/chat/ChatMessageRow";
 import { WorkspaceHeader } from "../../../../../../components/AppShell/WorkspaceHeader";
 import { Button } from "../../../../../../components/ui/Button";
 import { TextArea } from "../../../../../../components/ui/Input";
@@ -25,6 +27,12 @@ export default function ThreadPage() {
     Array<{ id: string; filename: string; url: string; sizeBytes: number; contentType: string }>
   >([]);
   const [uploading, setUploading] = useState(false);
+  const [myUserId, setMyUserId] = useState<string | null>(null);
+  const myUserIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    myUserIdRef.current = myUserId;
+  }, [myUserId]);
 
   async function loadFirstPage() {
     const page = await apiFetch<CursorPage<Message>>(`/dm/threads/${threadId}/messages?limit=30`);
@@ -48,6 +56,11 @@ export default function ThreadPage() {
     async function boot() {
       setError(null);
       try {
+        const me = await apiFetch<{ id: string }>("/workspaces/me");
+        if (cancelled) return;
+        myUserIdRef.current = me.id;
+        setMyUserId(me.id);
+
         await loadFirstPage();
         if (cancelled) return;
 
@@ -77,11 +90,20 @@ export default function ThreadPage() {
           if (msg.type === "message.created" && msg.message.threadId === threadId) {
             setMessages((prev) => {
               if (prev.some((m) => m.id === msg!.message.id)) return prev;
-              return [...prev, msg!.message];
+              const m = msg!.message;
+              return [...prev, { ...m, reactions: m.reactions ?? [] }];
             });
           }
           if (msg.type === "message.updated" && msg.message.threadId === threadId) {
             setMessages((prev) => prev.map((m) => (m.id === msg!.message.id ? { ...m, ...msg!.message } : m)));
+          }
+          if (msg.type === "reaction.updated" && msg.scope === "dm" && msg.threadId === threadId) {
+            const uid = myUserIdRef.current;
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === msg.messageId ? { ...m, reactions: mergeReactionWs(uid, m.reactions, msg) } : m,
+              ),
+            );
           }
           if (msg.type === "typing.updated" && msg.scope === "dm" && msg.threadId === threadId) {
             setTypingUsers((prev) => {
@@ -146,21 +168,14 @@ export default function ThreadPage() {
             <div className="muted">No messages yet.</div>
           ) : (
             messages.map((m) => (
-              <div key={m.id} className="col" style={{ gap: 2 }}>
-                <div className="muted" style={{ fontSize: 12 }}>
-                  {m.senderId} · {new Date(m.createdAt).toLocaleString()}
-                </div>
-                <div style={{ whiteSpace: "pre-wrap" }}>{m.body}</div>
-                {m.attachments?.length ? (
-                  <div className="col" style={{ gap: 6, marginTop: 6 }}>
-                    {m.attachments.map((a) => (
-                      <a key={a.id} className="uiLink" href={a.url} target="_blank" rel="noreferrer">
-                        {a.filename}
-                      </a>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
+              <ChatMessageRow
+                key={m.id}
+                variant="dm"
+                threadId={threadId}
+                message={m}
+                myUserId={myUserId}
+                onError={(err) => setError(err)}
+              />
             ))
           )}
         </div>

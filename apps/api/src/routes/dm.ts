@@ -5,6 +5,7 @@ import { requireAuth } from "../auth.js";
 import { publishThreadEvent } from "../ws/realtime.js";
 import type { WsServerMessage } from "@nottermost/shared";
 import { filterUsersAllowingDmMentions, resolveDmMentionRecipientIds } from "../mentionTargets.js";
+import { dmReactionCountsOnly, dmReactionList, dmReactionMap } from "../reactionSummary.js";
 
 export const dmRouter = Router();
 dmRouter.use(requireAuth);
@@ -220,12 +221,20 @@ dmRouter.get("/threads/:id/messages", async (req, res) => {
   });
 
   const hasMore = msgs.length > limit;
-  const items = (hasMore ? msgs.slice(0, limit) : msgs).map((m) => ({
+  const slice = hasMore ? msgs.slice(0, limit) : msgs;
+  const reactionById = await dmReactionMap(
+    slice.map((m) => m.id),
+    userId,
+  );
+  const items = slice.map((m) => ({
     id: m.id,
     threadId: m.threadId,
     senderId: m.senderId,
-    body: m.body,
+    body: m.deletedAt ? "" : m.body,
     createdAt: m.createdAt.toISOString(),
+    editedAt: m.editedAt?.toISOString() ?? null,
+    deletedAt: m.deletedAt?.toISOString() ?? null,
+    reactions: reactionById.get(m.id) ?? [],
   }));
 
   const nextCursor =
@@ -305,6 +314,9 @@ dmRouter.post("/threads/:id/messages", async (req, res) => {
       senderId: msg.senderId,
       body: msg.body,
       createdAt: msg.createdAt.toISOString(),
+      editedAt: null,
+      deletedAt: null,
+      reactions: [],
     },
   };
   void publishThreadEvent(thread.id, wsPayload);
@@ -315,6 +327,9 @@ dmRouter.post("/threads/:id/messages", async (req, res) => {
     senderId: msg.senderId,
     body: msg.body,
     createdAt: msg.createdAt.toISOString(),
+    editedAt: null,
+    deletedAt: null,
+    reactions: [],
   });
 });
 
@@ -347,8 +362,10 @@ dmRouter.patch("/threads/:threadId/messages/:messageId", async (req, res) => {
     data: { body: parsed.data.body, editedAt: new Date() },
   });
 
+  const reactions = await dmReactionList(updated.id, userId);
+
   const wsPayload: WsServerMessage = {
-    type: "message.updated" as any,
+    type: "message.updated",
     message: {
       id: updated.id,
       threadId: updated.threadId,
@@ -357,7 +374,8 @@ dmRouter.patch("/threads/:threadId/messages/:messageId", async (req, res) => {
       createdAt: updated.createdAt.toISOString(),
       editedAt: updated.editedAt?.toISOString() ?? null,
       deletedAt: updated.deletedAt?.toISOString() ?? null,
-    } as any,
+      reactions,
+    },
   };
   void publishThreadEvent(threadId.data, wsPayload);
   return res.json({ ok: true });
@@ -389,8 +407,10 @@ dmRouter.delete("/threads/:threadId/messages/:messageId", async (req, res) => {
     data: { deletedAt: new Date(), deletedById: userId },
   });
 
+  const reactions = await dmReactionList(updated.id, userId);
+
   const wsPayload: WsServerMessage = {
-    type: "message.updated" as any,
+    type: "message.updated",
     message: {
       id: updated.id,
       threadId: updated.threadId,
@@ -399,7 +419,8 @@ dmRouter.delete("/threads/:threadId/messages/:messageId", async (req, res) => {
       createdAt: updated.createdAt.toISOString(),
       editedAt: updated.editedAt?.toISOString() ?? null,
       deletedAt: updated.deletedAt?.toISOString() ?? null,
-    } as any,
+      reactions,
+    },
   };
   void publishThreadEvent(threadId.data, wsPayload);
   return res.status(204).end();
@@ -431,7 +452,17 @@ dmRouter.post("/threads/:threadId/messages/:messageId/reactions", async (req, re
     // already reacted
   }
 
-  const wsPayload: WsServerMessage = { type: "reaction.updated" as any, scope: "dm", threadId: threadId.data, messageId: msg.id, emoji: parsed.data.emoji } as any;
+  const counts = await dmReactionCountsOnly(msg.id);
+  const wsPayload: WsServerMessage = {
+    type: "reaction.updated",
+    scope: "dm",
+    threadId: threadId.data,
+    messageId: msg.id,
+    emoji: parsed.data.emoji,
+    actorUserId: userId,
+    delta: "add",
+    counts,
+  };
   void publishThreadEvent(threadId.data, wsPayload);
   return res.status(201).json({ ok: true });
 });
@@ -452,7 +483,17 @@ dmRouter.delete("/threads/:threadId/messages/:messageId/reactions", async (req, 
   if (!participant) return res.status(403).json({ error: "not_in_thread" });
 
   await prisma.messageReaction.deleteMany({ where: { messageId: messageId.data, userId, emoji: emoji.data } });
-  const wsPayload: WsServerMessage = { type: "reaction.updated" as any, scope: "dm", threadId: threadId.data, messageId: messageId.data, emoji: emoji.data } as any;
+  const counts = await dmReactionCountsOnly(messageId.data);
+  const wsPayload: WsServerMessage = {
+    type: "reaction.updated",
+    scope: "dm",
+    threadId: threadId.data,
+    messageId: messageId.data,
+    emoji: emoji.data,
+    actorUserId: userId,
+    delta: "remove",
+    counts,
+  };
   void publishThreadEvent(threadId.data, wsPayload);
   return res.status(204).end();
 });

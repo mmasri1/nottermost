@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import type { ChannelMessage, CursorPage, WsClientMessage, WsServerMessage } from "@nottermost/shared";
 import { apiFetch, apiUploadFile, getToken } from "../../../../../../lib/api";
+import { mergeReactionWs } from "../../../../../../lib/reactions";
+import { ChatMessageRow } from "../../../../../../components/chat/ChatMessageRow";
 import { WorkspaceHeader } from "../../../../../../components/AppShell/WorkspaceHeader";
 import { Button } from "../../../../../../components/ui/Button";
 import { Input, TextArea } from "../../../../../../components/ui/Input";
@@ -30,6 +32,17 @@ export default function ChannelPage() {
     Array<{ id: string; filename: string; url: string; sizeBytes: number; contentType: string }>
   >([]);
   const [uploading, setUploading] = useState(false);
+  const [myUserId, setMyUserId] = useState<string | null>(null);
+  const myUserIdRef = useRef<string | null>(null);
+  const openThreadRootIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    openThreadRootIdRef.current = openThreadRootId;
+  }, [openThreadRootId]);
+
+  useEffect(() => {
+    myUserIdRef.current = myUserId;
+  }, [myUserId]);
 
   async function loadFirstPage() {
     const page = await apiFetch<CursorPage<ChannelMessage>>(`/channels/${channelId}/messages?limit=30`);
@@ -71,6 +84,11 @@ export default function ChannelPage() {
     async function boot() {
       setError(null);
       try {
+        const me = await apiFetch<{ id: string }>("/workspaces/me");
+        if (cancelled) return;
+        myUserIdRef.current = me.id;
+        setMyUserId(me.id);
+
         await loadFirstPage();
         if (cancelled) return;
 
@@ -113,6 +131,21 @@ export default function ChannelPage() {
             return;
           }
 
+          if (msg.type === "reaction.updated" && msg.scope === "channel" && msg.channelId === channelId) {
+            const uid = myUserIdRef.current;
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === msg.messageId ? { ...m, reactions: mergeReactionWs(uid, m.reactions, msg) } : m,
+              ),
+            );
+            setThreadMessages((prev) =>
+              prev.map((m) =>
+                m.id === msg.messageId ? { ...m, reactions: mergeReactionWs(uid, m.reactions, msg) } : m,
+              ),
+            );
+            return;
+          }
+
           if (msg.type !== "channelMessage.created") return;
           if (msg.message.channelId !== channelId) return;
 
@@ -120,7 +153,8 @@ export default function ChannelPage() {
           if (!msg.message.threadRootId) {
             setMessages((prev) => {
               if (prev.some((m) => m.id === msg!.message.id)) return prev;
-              return [...prev, msg!.message];
+              const m = msg!.message;
+              return [...prev, { ...m, reactions: m.reactions ?? [] }];
             });
             return;
           }
@@ -138,10 +172,11 @@ export default function ChannelPage() {
                 : m,
             ),
           );
-          if (openThreadRootId === rootId) {
+          if (openThreadRootIdRef.current === rootId) {
             setThreadMessages((prev) => {
               if (prev.some((m) => m.id === msg!.message.id)) return prev;
-              return [...prev, msg!.message];
+              const m = msg!.message;
+              return [...prev, { ...m, reactions: m.reactions ?? [] }];
             });
           }
         });
@@ -198,44 +233,22 @@ export default function ChannelPage() {
             <div className="muted">No messages yet.</div>
           ) : (
             messages.map((m) => (
-              <div key={m.id} className="col" style={{ gap: 2 }}>
-                <div className="muted" style={{ fontSize: 12 }}>
-                  {m.senderId} · {new Date(m.createdAt).toLocaleString()}
-                </div>
-                <div style={{ whiteSpace: "pre-wrap" }}>{m.body}</div>
-                {m.attachments?.length ? (
-                  <div className="col" style={{ gap: 6, marginTop: 6 }}>
-                    {m.attachments.map((a) => (
-                      <a key={a.id} className="uiLink" href={a.url} target="_blank" rel="noreferrer">
-                        {a.filename}
-                      </a>
-                    ))}
-                  </div>
-                ) : null}
-                <div className="row" style={{ gap: 10, marginTop: 4 }}>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    type="button"
-                    onClick={async () => {
-                      setOpenThreadRootId(m.id);
-                      setThreadBody("");
-                      try {
-                        await loadThreadFirstPage(m.id);
-                      } catch (err) {
-                        setError(err instanceof Error ? err.message : "load_thread_failed");
-                      }
-                    }}
-                  >
-                    Reply{m.replyCount ? ` · ${m.replyCount}` : ""}
-                  </Button>
-                  {m.lastReplyAt ? (
-                    <span className="muted" style={{ fontSize: 12 }}>
-                      last reply {new Date(m.lastReplyAt).toLocaleString()}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
+              <ChatMessageRow
+                key={m.id}
+                variant="channel"
+                channelId={channelId}
+                message={m}
+                myUserId={myUserId}
+                onError={(err) => setError(err)}
+                showReply
+                onOpenThread={() => {
+                  setOpenThreadRootId(m.id);
+                  setThreadBody("");
+                  void loadThreadFirstPage(m.id).catch((err) =>
+                    setError(err instanceof Error ? err.message : "load_thread_failed"),
+                  );
+                }}
+              />
             ))
           )}
           </div>
@@ -287,12 +300,15 @@ export default function ChannelPage() {
                   <div className="muted">No replies yet.</div>
                 ) : (
                   threadMessages.map((m) => (
-                    <div key={m.id} className="col" style={{ gap: 2 }}>
-                      <div className="muted" style={{ fontSize: 12 }}>
-                        {m.senderId} · {new Date(m.createdAt).toLocaleString()}
-                      </div>
-                      <div style={{ whiteSpace: "pre-wrap" }}>{m.body}</div>
-                    </div>
+                    <ChatMessageRow
+                      key={m.id}
+                      variant="channel"
+                      channelId={channelId}
+                      message={m}
+                      myUserId={myUserId}
+                      onError={(err) => setError(err)}
+                      showReply={false}
+                    />
                   ))
                 )}
               </div>
