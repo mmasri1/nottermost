@@ -70,4 +70,5 @@ The format is based on **Keep a Changelog**, and this project aims to follow **S
 - Top bar search: fix search icon overlapping placeholder/value on some browsers
 - Sidebar: pin Settings to the bottom (independent of channel/DM list height)
 - Workspace page: tighten button sizing/row layout and remove add-member tip text
+- Workspace invites + login: normalize emails to avoid case-sensitivity issues
 

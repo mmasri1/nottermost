@@ -219,7 +219,10 @@ workspacesRouter.post("/:id/members", async (req, res) => {
   const parsed = addMemberSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
 
-  const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
+  const email = parsed.data.email.trim().toLowerCase();
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: "insensitive" } },
+  });
   if (!user) return res.status(404).json({ error: "user_not_found" });
 
   try {

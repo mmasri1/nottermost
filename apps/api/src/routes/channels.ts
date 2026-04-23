@@ -206,7 +206,11 @@ channelsRouter.post("/:id/invites", async (req, res) => {
   });
   if (!meInChannel) return res.status(403).json({ error: "not_in_channel" });
 
-  const invitee = await prisma.user.findUnique({ where: { email: parsed.data.email }, select: { id: true } });
+  const email = parsed.data.email.trim().toLowerCase();
+  const invitee = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: "insensitive" } },
+    select: { id: true },
+  });
   if (!invitee) return res.status(404).json({ error: "user_not_found" });
 
   const inviteeWsMembership = await requireWorkspaceMember(channel.workspaceId, invitee.id);
