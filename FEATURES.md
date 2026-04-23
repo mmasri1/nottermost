@@ -65,7 +65,6 @@ This file tracks which features are done, in progress, or not started.
 
 ### User profiles / admin
 - [X] Display names, avatars, status, profile editing
-- [ ] Roles/permissions beyond “owner/member”, user deactivation, audits
 
 ---
 

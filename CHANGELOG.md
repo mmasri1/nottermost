@@ -49,7 +49,9 @@ The format is based on **Keep a Changelog**, and this project aims to follow **S
   - GitHub templates: issue templates + PR template
   - `FEATURES.md` feature tracker
   - `ENGINEERING_GUIDELINES.md` workflow/commit rules for humans + AI
-  - `index.md` for GitHub Pages (renders `README.md`)
+  - `index.md` for docs landing page
+  - `docs/` documentation scaffold (overview, getting started, apps, reference, deploy)
+  - `ROADMAP.md` infra-first roadmap
 
 ### Changed
 - README tightened while preserving architecture; added operational maturity, production deployments, incident handling, scaling, and real-environment monitoring sections
@@ -59,6 +61,7 @@ The format is based on **Keep a Changelog**, and this project aims to follow **S
 - Web UI: improve workspace shell (sidebar quick actions, global search in top bar, settings page) and set dynamic tab titles per page
 - Web UI: remove internal IDs from the UI and display member/channel names instead; refine top-bar search + sidebar settings placement
 - Web UI: make workspace shell responsive (mobile sidebar toggle, collapse right rails/threads on small screens) and switch profile/workspace pages to full-bleed layouts
+- `index.md`: convert from “include README” to a docs homepage with links into `docs/`
 
 ### Fixed
 - Local Docker builds: avoid `workspace:*` dependency spec in container npm installs
