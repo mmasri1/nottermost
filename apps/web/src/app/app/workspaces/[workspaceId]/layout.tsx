@@ -127,7 +127,23 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
         <div className="topbar">
           <div className="topbarLeft">{error ? <span className="topbarError">Error: {error}</span> : null}</div>
           <div className="topbarRight">
-            <span className="topbarHint">Notifications: {unreadNotifs} unread</span>
+            <span className="topbarHint">Notifications</span>
+            <span className="notifBell" title={`${unreadNotifs} unread notifications`} aria-label="Notifications">
+              <svg viewBox="0 0 20 20" width="18" height="18" fill="none" aria-hidden="true">
+                <path
+                  d="M10 18a2.2 2.2 0 0 0 2.2-2.2H7.8A2.2 2.2 0 0 0 10 18Z"
+                  fill="currentColor"
+                  opacity="0.92"
+                />
+                <path
+                  d="M15.4 14.2H4.6c-.2 0-.4-.1-.5-.3-.1-.2-.1-.4 0-.6.9-1.1 1.4-2.4 1.4-3.8V8.6c0-2.6 1.8-4.8 4.2-5.3V2.8c0-.4.3-.8.8-.8s.8.3.8.8v.5c2.4.5 4.2 2.7 4.2 5.3v.9c0 1.4.5 2.7 1.4 3.8.1.2.2.4 0 .6-.1.2-.3.3-.5.3Z"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              {unreadNotifs > 0 ? <span className="notifBadge">{unreadNotifs > 99 ? "99+" : unreadNotifs}</span> : null}
+            </span>
           </div>
         </div>
       }
