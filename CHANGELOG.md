@@ -52,6 +52,7 @@ The format is based on **Keep a Changelog**, and this project aims to follow **S
   - `index.md` for docs landing page
   - `docs/` documentation scaffold (overview, getting started, apps, reference, deploy)
   - `ROADMAP.md` infra-first roadmap
+  - Expanded docs homepage + initial “feature list” + demo placeholder image
 
 ### Changed
 - README tightened while preserving architecture; added operational maturity, production deployments, incident handling, scaling, and real-environment monitoring sections

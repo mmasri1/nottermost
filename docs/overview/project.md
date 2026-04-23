@@ -20,6 +20,8 @@ Nottermost is a **Mattermost-inspired** team chat platform. The project intentio
 - **Files**: upload + grant model (stored locally in dev; deploy target is object storage)
 - **Search**: endpoint exists (implementation details documented in API page)
 
+Full breakdown: `docs/overview/features.md`. Demo/screenshot notes: `docs/overview/demo.md`.
+
 ## Repo layout
 
 - `apps/api`: API + realtime WebSocket server + Prisma (Postgres)
